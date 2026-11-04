@@ -1,7 +1,7 @@
 # Application Architecture Document
 
 ## Overview
-This document outlines the architecture, technology stack, and file system structure of the **Meeting Bot** application. The application is a real-time collaborative platform that allows users to create, schedule, and join video meetings directly within the app, transcribe conversations, and manage meeting assets and organizations.
+This document outlines the architecture, technology stack, and file system structure of the **Meetup** application. The application is a real-time collaborative platform that allows users to create, schedule, and join video meetings directly within the app, transcribe conversations, and manage meeting assets and organizations.
 
 ## Tech Stack
 - **Frontend Framework**: Next.js 16 (App Router) & React 19
@@ -29,7 +29,7 @@ This document outlines the architecture, technology stack, and file system struc
 ## File System & Directory Structure
 
 ```text
-meeting-bot/
+meetup/
 ├── app/                        # Next.js App Router root
 │   ├── (auth)/                 # Route group for Clerk Sign-in/Sign-up pages
 │   ├── (dashboard)/            # Dashboard routes (insights, meetings, settings, tasks, organization)

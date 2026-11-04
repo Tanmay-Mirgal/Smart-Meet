@@ -1,4 +1,4 @@
-# Meeting Bot: Next Features and Optimization Roadmap
+# Meetup: Next Features and Optimization Roadmap
 
 This document lists the highest-value improvements that can be implemented next in this application. It is split into:
 

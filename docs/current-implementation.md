@@ -1,4 +1,4 @@
-# Meeting Bot Current Implementation Snapshot
+# Meetup Current Implementation Snapshot
 
 Snapshot date: 2026-03-22
 
@@ -6,7 +6,7 @@ This document describes what is actually implemented in the current codebase. It
 
 ## 1. Executive Summary
 
-Meeting Bot is a Next.js 16 + React 19 application that uses Clerk for auth and organizations, Convex for backend/database/realtime state, WebRTC for live media, browser Web Audio APIs for microphone capture, and Next.js API routes for AI transcription and summarization through Groq.
+Meetup is a Next.js 16 + React 19 application that uses Clerk for auth and organizations, Convex for backend/database/realtime state, WebRTC for live media, browser Web Audio APIs for microphone capture, and Next.js API routes for AI transcription and summarization through Groq.
 
 Today the app already supports a real end-to-end meeting workflow:
 

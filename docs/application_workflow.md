@@ -1,7 +1,7 @@
-# Application Workflow: MeetMind AI
+# Application Workflow: Meetup
 
 ## 1. Onboarding & Authentication Workflow
-- **Landing Page:** User arrives at the Marketing page outlining the value of MeetMind AI (pricing, features).
+- **Landing Page:** User arrives at the Marketing page outlining the value of Meetup (pricing, features).
 - **Sign Up / Sign In:** User clicks "Get Started" and is redirected to Clerk's hosted or custom-styled Auth UI.
 - **Organization Setup:** Upon first login, Clerk prompts the user to create an Organization (Workspace) or join an existing one. 
 - **Subscription Check:** Validates the organization's tier via Clerk+Stripe. Free tiers have usage limits (e.g., 5 meeting transcripts/month).

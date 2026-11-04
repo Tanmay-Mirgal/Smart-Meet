@@ -78,7 +78,7 @@ export function createMetadata({
           url: fullOgImage,
           width: 1200,
           height: 630,
-          alt: `${SITE_NAME} — ${title}`,
+          alt: socialTitle,
         },
       ],
     },

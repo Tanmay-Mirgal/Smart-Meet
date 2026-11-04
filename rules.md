@@ -1,6 +1,6 @@
-# MeetMind AI: Production & Architecture Rules
+# Meetup: Production & Architecture Rules
 
-This document outlines the strict engineering, design, and architecture rules for the MeetMind AI project. Any code written or modified must adhere to these standards to maintain a robust, scalable, and premium application.
+This document outlines the strict engineering, design, and architecture rules for the Meetup project. Any code written or modified must adhere to these standards to maintain a robust, scalable, and premium application.
 
 ---
 

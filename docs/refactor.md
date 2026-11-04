@@ -3,7 +3,7 @@ Here is a **clean, production-grade Codex prompt (in proper Markdown)** that you
 
 ---
 
-# 🚀 Codex Optimization Prompt — Meeting Bot (Next.js + Convex + WebRTC + AI)
+# 🚀 Codex Optimization Prompt — Meetup (Next.js + Convex + WebRTC + AI)
 
 ## 📌 Context
 

@@ -1,4 +1,6 @@
-# 🎙️ Smart Meeter
+# Meetup — AI meeting workspace
+
+**Live:** [meetup.tanmaymirgal.dev](https://meetup.tanmaymirgal.dev)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
@@ -6,7 +8,7 @@
 [![Clerk](https://img.shields.io/badge/Clerk-Auth-purple?style=for-the-badge&logo=clerk)](https://clerk.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38bdf8?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 
-**Smart Meeter (MeetMind AI)** is a real-time, collaborative video conferencing platform featuring auto-transcription, AI-generated meeting summaries, action items extraction, and automated task tracking. Built with modern React 19, Next.js 16, Convex, Clerk, WebRTC, and Groq's high-speed AI inference models.
+**Meetup** is a real-time, collaborative video meeting platform featuring live transcription (Hindi, Marathi and English), AI-generated meeting summaries, action item extraction and automated task tracking. Built with React 19, Next.js 16, Convex, Clerk, WebRTC, NVIDIA Riva speech recognition and Groq inference.
 
 ---
 
@@ -15,10 +17,10 @@
 - **🔒 Organization-Scoped Multi-Tenancy**: Built-in tenant isolation and organization switching powered by Clerk.
 - **📹 Real-Time WebRTC Video Rooms**: Peer-to-peer audio, video, and screen sharing using Google's STUN signaling protocol managed dynamically through Convex tables.
 - **💬 Reactive Chat & Room Presence**: Real-time message exchanges and live status tracking (mic, camera, screensharing, heartbeat) for all room participants.
-- **✍️ Multilingual Live Transcription**: Real-time microphone audio capture processed via Groq Whisper (`whisper-large-v3`). Supports `Auto`, `English`, `Hindi`, and `Hinglish` translation/transcription modes.
+- **✍️ Multilingual Live Transcription**: Real-time microphone audio is transcribed by NVIDIA Parakeet (Riva ASR) with Groq Whisper (`whisper-large-v3`) as the fallback. Supports `Auto`, `English`, `Hindi`, `Marathi` and mixed Hindi/English/Marathi modes. See [Transcription providers](#-transcription-providers).
 - **🤖 Intelligent Meeting Summaries**: Automated AI summarization via Groq Llama 3.3 (`llama-3.3-70b-versatile`) that outputs detailed summaries, key points, and core decisions.
 - **✅ Automagic Action Items & Tasks**: Action items generated from meetings are automatically extracted and converted into interactive, trackable organization tasks.
-- **🎨 Modern Design System**: Editorial-grade dark theme powered by Tailwind CSS v4, Radix UI, and shadcn/ui. Built with soft-minimalist tonal layering, removing harsh 1px borders in favor of background depth shifts.
+- **🎨 Meetup Design System**: A violet-on-ink dark theme with Manrope headings and Inter body text, built on Tailwind CSS v4, Radix UI and shadcn/ui. Brand tokens live in `app/globals.css`; the logo is in `components/brand/logo.tsx`.
 - **📈 Workspace Insights**: Real-time analytics dashboards presenting organizational productivity metrics, meeting frequency, and timeline views via Recharts.
 - **📓 Collaborative Whiteboarding**: Embedded whiteboards powered by Excalidraw for real-time visual collaboration.
 
@@ -42,7 +44,7 @@ flowchart TD
 
     B --> I
     D --> J["Groq Chat Completions (Llama 3.3)"]
-    E --> K["Groq Whisper API"]
+    E --> K["NVIDIA Riva ASR (gRPC) → Groq Whisper fallback"]
     F --> L["P2P Media Streams (STUN)"]
 ```
 
@@ -51,7 +53,7 @@ flowchart TD
 ## 📁 File Structure
 
 ```text
-Smart_Meeter/
+meetup/
 ├── app/                        # Next.js App Router root
 │   ├── (auth)/                 # Clerk Auth routes (Sign-in/up)
 │   ├── (dashboard)/            # Dashboard, meetings, tasks, settings
@@ -64,7 +66,7 @@ Smart_Meeter/
 │   ├── dashboard/              # Widgets, metrics, and chart views
 │   └── home/                   # Marketing and landing page components
 ├── features/                   # Core business domain logic
-│   ├── ai/                     # AI transcription processing hooks & APIs
+│   ├── ai/                     # Transcription hook, modes & insights
 │   ├── meeting/                # Meeting models, dialogs, forms, views
 │   ├── tasks/                  # Tasks management views & logic
 │   └── webrtc/                 # WebRTC hooks, track managers, participant grids
@@ -73,7 +75,7 @@ Smart_Meeter/
 │   ├── users.ts / meetings.ts  # Database operations & validation
 │   └── http.ts                 # Clerk webhooks mirror endpoints
 ├── hooks/                      # Global helper hooks (mobile detection, etc.)
-└── lib/                        # Utility scripts and metadata helper functions
+└── lib/                        # Site config, SEO metadata, plans, transcription providers
 ```
 
 ---
@@ -95,24 +97,24 @@ npm install
 ```
 
 ### 3. Set Up Environment Variables
-Create a `.env.local` file in the root directory and configure the following:
+Copy [`.env.example`](.env.example) to `.env.local` and fill in the values. At minimum you need Clerk, Convex and one transcription provider:
 
 ```env
-# Next Public Clerk Settings
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+NEXT_PUBLIC_CONVEX_URL=
 
-# Convex Deployment
-NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
+# Transcription (either or both)
+NVIDIA_API_KEY=            # https://build.nvidia.com
+GROQ_API_KEY=              # Whisper fallback + AI summaries
+TRANSCRIPTION_PROVIDER=auto
 
-# Groq API Key (for Transcription & Summary)
-GROQ_API_KEY=your_groq_api_key
-
-# Clerk Webhook Secret (for User Sync)
-CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
+# Production only — canonical URL for SEO, sitemap and invite links
+NEXT_PUBLIC_APP_URL=https://meetup.tanmaymirgal.dev
 ```
+
+When `NEXT_PUBLIC_APP_URL` is unset the app uses `http://localhost:3000` in development and `https://meetup.tanmaymirgal.dev` in production.
 
 ### 4. Start the Convex Backend
 In a separate terminal, launch the Convex development server. This compiles and deploys your schema, functions, and listens for changes:
@@ -127,6 +129,22 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
+
+---
+
+## 🎙️ Transcription providers
+
+`/api/transcribe` routes every audio chunk through `lib/transcription`:
+
+| `TRANSCRIPTION_PROVIDER` | Behaviour |
+| --- | --- |
+| `auto` (default) | NVIDIA Parakeet for English / Hindi / Hindi+English, Groq Whisper for Marathi modes. Falls back to whichever provider is configured. |
+| `nvidia` | NVIDIA first for every mode (Marathi uses language `multi`), Groq as the fallback. |
+| `groq` | Groq Whisper only. |
+
+- NVIDIA is called over gRPC (`grpc.nvcf.nvidia.com:443`) with `NVIDIA_API_KEY`; the channel is reused between chunks. A self-hosted Speech NIM works via `NVIDIA_ASR_HTTP_URL` or `NVIDIA_ASR_SERVER`.
+- Parakeet multilingual supports Hindi and English but not Marathi, which is why Marathi modes prefer Whisper in `auto`.
+- The browser downsamples audio to 16 kHz before upload, which cuts each request to about a third of its size.
 
 ---
 

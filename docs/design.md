@@ -1,4 +1,4 @@
-# Design System Strategy: The Digital Curator (MeetMind AI)
+# Design System Strategy: The Digital Curator (Meetup)
 
 ## 1. Overview & Creative North Star
 Our North Star is a high-end editorial experience where data isn't just displayed—it is presented. We reject the "boxed-in" look of traditional SaaS dashboards. By leveraging intentional asymmetry, expansive breathing room, and a sophisticated hierarchy of surfaces, we create an environment that feels authoritative yet effortless. The aesthetic is "Soft Minimalism": a rigorous commitment to clarity where depth is communicated through tonal shifts rather than heavy lines, and importance is signaled through elite typography.

@@ -1,7 +1,7 @@
-# MeetMind AI: Architecture Plan
+# Meetup: Architecture Plan
 
 ## Overview
-MeetMind AI follows a modern, serverless, and highly scalable architecture. The stack is designed for rapid iteration, real-time data sync, and seamless AI integration.
+Meetup follows a modern, serverless, and highly scalable architecture. The stack is designed for rapid iteration, real-time data sync, and seamless AI integration.
 
 - **Frontend:** Next.js (App Router)
 - **Database & Backend logic:** Convex
