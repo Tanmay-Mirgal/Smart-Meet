@@ -23,6 +23,7 @@ import {
   type MinutesActionItem,
   type MinutesDocumentData,
 } from "@/features/meeting/lib/minutes-document";
+import { PageHeader, HeaderStat } from "@/components/shared/page-header";
 
 type MinutesMeeting = {
   _id: string;
@@ -126,67 +127,16 @@ export function MinutesOfMeetingsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-linear-to-br from-card via-card to-muted/30 p-6 lg:p-8">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/3 h-32 w-64 rounded-full bg-sky-500/5 blur-3xl" />
-
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-                <FileText className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Email-ready archive
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-              Minutes of Meetings
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Browse professional minutes documents generated from your saved meeting summaries and download them in one click.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-4 py-2.5 backdrop-blur-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <FileText className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xl font-bold tabular-nums text-foreground">
-                  {minutes.length}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Documents</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-4 py-2.5 backdrop-blur-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-                <ListChecks className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xl font-bold tabular-nums text-foreground">
-                  {totalActionItems}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Action items</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-4 py-2.5 backdrop-blur-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10">
-                <CheckCircle2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-              </div>
-              <div>
-                <p className="text-xl font-bold tabular-nums text-foreground">
-                  {meetingsWithDecisions}
-                </p>
-                <p className="text-[11px] text-muted-foreground">With decisions</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={FileText}
+        eyebrow="Email-ready archive"
+        title="Minutes of Meetings"
+        description="Browse professional minutes documents generated from your saved meeting summaries and download them in one click."
+      >
+        <HeaderStat icon={FileText} value={minutes.length} label="Documents" />
+        <HeaderStat icon={ListChecks} value={totalActionItems} label="Action items" />
+        <HeaderStat icon={CheckCircle2} value={meetingsWithDecisions} label="With decisions" />
+      </PageHeader>
 
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="pb-4">

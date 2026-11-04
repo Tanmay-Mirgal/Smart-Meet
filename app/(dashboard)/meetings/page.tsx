@@ -3,7 +3,7 @@ import { createMetadata } from "@/lib/metadata";
 
 export const metadata = createMetadata({
   title: "Meetings",
-  description: "Browse every scheduled, live, and completed meeting in your Smart Meet organization.",
+  description: "Browse every scheduled, live, and completed meeting in your Meetup organization.",
   path: "/meetings",
   index: false,
 });

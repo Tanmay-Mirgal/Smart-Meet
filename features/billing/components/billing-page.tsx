@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { billingService } from "@/features/billing/services/billing-service";
 import { useSyncOrganizationBilling } from "@/features/billing/hooks/use-sync-organization-billing";
 import { PricingCards } from "@/features/billing/components/pricing-cards";
+import { PageHeader } from "@/components/shared/page-header";
 
 const featureLabels = [
   { key: "unlimitedMeetings", label: "Unlimited meetings" },
@@ -33,15 +34,16 @@ export function BillingPage() {
   );
 
   // Called after successful Razorpay payment — triggers billing re-sync
+  const organizationId = organization?.id;
   const handleUpgradeSuccess = useCallback(() => {
-    if (organization?.id) {
+    if (organizationId) {
       void fetch("/api/billing/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId: organization.id }),
+        body: JSON.stringify({ orgId: organizationId }),
       });
     }
-  }, [organization?.id]);
+  }, [organizationId]);
 
   // 1. Org context still loading
   if (!orgLoaded) {
@@ -93,40 +95,22 @@ export function BillingPage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-linear-to-br from-card via-card to-muted/30 p-6 lg:p-8">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/2 h-32 w-64 -translate-x-1/2 rounded-full bg-blue-500/5 blur-3xl" />
-
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-                <CreditCard className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Workspace Billing
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-              Billing
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Manage your organization plan, track meeting capacity, and unlock premium collaboration features.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              {billing.planName}
-            </Badge>
-            <Button variant="outline" asChild className="gap-2">
-              <Link href="/dashboard">
-                Back to dashboard
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={CreditCard}
+        eyebrow="Workspace Billing"
+        title="Billing"
+        description="Manage your organization plan, track meeting capacity, and unlock premium collaboration features."
+      >
+        <Badge variant="secondary" className="px-3 py-1 text-xs">
+          {billing.planName}
+        </Badge>
+        <Button variant="outline" asChild className="gap-2">
+          <Link href="/dashboard">
+            Back to dashboard
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-border/60 shadow-sm">
@@ -246,7 +230,7 @@ export function BillingPage() {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                  <CalendarRange className="h-4 w-4 text-primary" />
+                  <CalendarRange className="h-4 w-4 text-brand" />
                 </div>
                 <CardTitle className="text-base font-semibold">
                   Current Plan Summary
@@ -264,7 +248,7 @@ export function BillingPage() {
               </div>
               <div className="rounded-lg border border-border/60 bg-card/50 px-4 py-3">
               <div className="flex items-center gap-2 text-foreground">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Sparkles className="h-4 w-4 text-brand" />
                   <span className="font-medium">Billing snapshot refreshes after plan sync</span>
                 </div>
                 <p className="mt-1">

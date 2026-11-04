@@ -411,7 +411,7 @@ export function MeetingSidePanel({
               />
             ) : isSummarizing ? (
               <div className="flex flex-col items-center gap-3 pt-10 text-center text-sm text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <Loader2 className="h-6 w-6 animate-spin text-brand" />
                 <p>Analyzing transcript...</p>
               </div>
             ) : (

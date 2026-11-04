@@ -2199,7 +2199,7 @@ export const syncMeetingToGoogleCalendar = internalAction({
         location: joinUrl ?? undefined,
         source: joinUrl
           ? {
-              title: "Meeting Bot",
+              title: "Meetup",
               url: joinUrl,
             }
           : undefined,

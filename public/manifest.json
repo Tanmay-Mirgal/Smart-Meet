@@ -1,24 +1,46 @@
 {
-  "name": "Smart Meet",
-  "short_name": "Smart Meet",
-  "description": "AI-powered meeting intelligence — real-time transcription, summaries, and team collaboration.",
-  "start_url": "/",
+  "id": "/",
+  "name": "Meetup",
+  "short_name": "Meetup",
+  "description": "Meetup is the AI meeting workspace — live video rooms, real-time Hindi, Marathi and English transcription, instant summaries and action items.",
+  "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0b14",
-  "theme_color": "#0a0b14",
-  "orientation": "portrait-primary",
+  "background_color": "#0B0A12",
+  "theme_color": "#0B0A12",
+  "orientation": "any",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Meetings",
+      "url": "/meetings"
+    },
+    {
+      "name": "Tasks",
+      "url": "/tasks"
     }
   ],
   "categories": ["productivity", "business", "utilities"],

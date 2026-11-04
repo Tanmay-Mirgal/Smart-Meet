@@ -4,7 +4,7 @@ import { createMetadata } from '@/lib/metadata';
 
 export const metadata = createMetadata({
   title: "Onboarding",
-  description: "Set up your organization and configure your Smart Meet workspace.",
+  description: "Set up your organization and configure your Meetup workspace.",
   path: "/onboarding",
   index: false,
 });

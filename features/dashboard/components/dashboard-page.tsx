@@ -27,6 +27,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/loading-block";
 import { dashboardService } from "@/features/dashboard/services/dashboard-service";
 import { invitationService } from "@/features/invitations/services/invitation-service";
+import { PageHeader } from "@/components/shared/page-header";
 
 const statConfig = [
   {
@@ -36,7 +37,7 @@ const statConfig = [
     gradient: "from-blue-500/10 via-blue-400/5 to-transparent",
     iconColor: "text-blue-500",
     iconBg: "bg-blue-500/10",
-    trend: "+12%",
+    trend: "All time",
     isLive: false,
   },
   {
@@ -56,7 +57,7 @@ const statConfig = [
     gradient: "from-violet-500/10 via-violet-400/5 to-transparent",
     iconColor: "text-violet-500",
     iconBg: "bg-violet-500/10",
-    trend: "+8%",
+    trend: "Generated",
     isLive: false,
   },
   {
@@ -182,47 +183,26 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* ── Hero Header ── */}
-      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-linear-to-br from-card via-card to-muted/30 p-6 lg:p-8">
-        {/* decorative blob */}
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/2 h-32 w-64 -translate-x-1/2 rounded-full bg-blue-500/5 blur-3xl" />
-
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Operations Center
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-              Dashboard
-            </h1>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              Track live meetings, AI summaries, and follow-up tasks — all from
-              one place.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {pendingInvitations.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-                <Inbox className="h-3.5 w-3.5" />
-                {pendingInvitations.length} pending invite
-                {pendingInvitations.length !== 1 ? "s" : ""}
-              </span>
-            )}
-            <Button variant="outline" asChild className="gap-2">
-              <Link href="/meetings">
-                View archive
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={Sparkles}
+        eyebrow="Operations Center"
+        title="Dashboard"
+        description="Track live meetings, AI summaries, and follow-up tasks — all from one place."
+      >
+        {pendingInvitations.length > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400">
+            <Inbox className="h-3.5 w-3.5" />
+            {pendingInvitations.length} pending invite
+            {pendingInvitations.length !== 1 ? "s" : ""}
+          </span>
+        )}
+        <Button variant="outline" asChild className="gap-2">
+          <Link href="/meetings">
+            View archive
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </PageHeader>
 
       {/* ── Stats Grid ── */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -247,7 +227,6 @@ export function DashboardPage() {
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-                    <TrendingUp className="h-3 w-3" />
                     {item.trend}
                   </span>
                 )}
@@ -420,7 +399,7 @@ export function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <Inbox className="h-4.5 w-4.5 text-primary" />
+              <Inbox className="h-4.5 w-4.5 text-brand" />
             </div>
             <div>
               <CardTitle className="text-base font-semibold">
@@ -453,7 +432,7 @@ export function DashboardPage() {
                 className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-4 transition-all duration-200 hover:border-border hover:bg-muted/30 lg:flex-row lg:items-center lg:justify-between"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-brand">
                     {invite.organizerName?.charAt(0).toUpperCase() ?? "?"}
                   </div>
                   <div className="min-w-0">

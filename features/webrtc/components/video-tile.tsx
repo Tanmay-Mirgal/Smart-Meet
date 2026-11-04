@@ -203,7 +203,7 @@ export function VideoTile({
             >
               <Avatar className={cn(avatarSizeClass, "shadow-md")}>
                 <AvatarImage className="rounded-[100%]!" alt={name} src={imageUrl} />
-                <AvatarFallback className={cn("bg-primary/20 font-semibold text-primary", avatarFallbackTextClass)}>
+                <AvatarFallback className={cn("bg-primary/20 font-semibold text-brand", avatarFallbackTextClass)}>
                   {initials || "?"}
                 </AvatarFallback>
               </Avatar>

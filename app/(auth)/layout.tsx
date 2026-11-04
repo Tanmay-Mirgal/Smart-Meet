@@ -1,146 +1,106 @@
-import React from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import {
-  BrainCircuit,
-  CheckCircle2,
-  Radio,
-  Sparkles,
-  Users,
-  Zap,
-} from 'lucide-react';
+import { AudioLines, BrainCircuit, CheckCircle2, ListChecks, Users, type LucideIcon } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
-const features = [
+const HIGHLIGHTS: ReadonlyArray<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  tone: string;
+}> = [
   {
-    icon: Radio,
-    title: 'Real-time transcription',
-    desc: '99% accuracy across 40+ languages',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
+    icon: AudioLines,
+    title: "Live transcription",
+    description: "Hindi, Marathi and English, even mixed",
+    tone: "bg-emerald-500/12 text-emerald-300",
   },
   {
     icon: BrainCircuit,
-    title: 'AI-powered summaries',
-    desc: 'Decisions & action items extracted instantly',
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10',
+    title: "AI summaries",
+    description: "Decisions and key points, instantly",
+    tone: "bg-violet-500/12 text-violet-300",
+  },
+  {
+    icon: ListChecks,
+    title: "Action items",
+    description: "Follow-ups on a shared task board",
+    tone: "bg-amber-500/12 text-amber-300",
   },
   {
     icon: Users,
-    title: 'Team workspaces',
-    desc: 'Collaborate and search conversation history',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-  },
-  {
-    icon: Zap,
-    title: 'Instant setup',
-    desc: 'Start your first meeting in under 60 seconds',
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
+    title: "Team workspaces",
+    description: "Invite your team and keep history in one place",
+    tone: "bg-sky-500/12 text-sky-300",
   },
 ];
+
+const TRUST = ["Free plan available", "No credit card", "Runs in your browser"] as const;
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
-
-      {/* ── Left panel ── */}
-      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-border/60 p-10 lg:flex">
-
-        {/* Background glow blobs */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-primary/8 blur-[80px]" />
-          <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-blue-500/5 blur-[80px]" />
-          <div className="absolute top-1/2 left-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/4 blur-[60px]" />
+      {/* ── Brand panel ── */}
+      <aside className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-border p-10 lg:flex xl:p-14">
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="bg-dot-grid absolute inset-0 opacity-50" />
+          <div className="animate-aurora absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-primary/25 blur-[110px]" />
+          <div className="animate-aurora absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-warm/15 blur-[100px] [animation-delay:-9s]" />
         </div>
 
-        {/* Grid overlay */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, oklch(1 0 0 / 6%) 1px, transparent 1px), linear-gradient(to bottom, oklch(1 0 0 / 6%) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-
-        {/* ── Top: Logo ── */}
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 overflow-hidden transition-colors group-hover:bg-primary/15">
-              <Image src="/logo.png" alt="Smart Meet Logo" width={36} height={36} className="object-contain" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-foreground">Smart Meet</span>
-          </Link>
+          <Logo size="lg" />
         </div>
 
-        {/* ── Middle: Headline + Features ── */}
-        <div className="relative z-10 flex flex-col gap-10">
+        <div className="relative z-10 flex max-w-xl flex-col gap-10">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary uppercase tracking-wider">
-              <Sparkles className="h-3 w-3" />
-              AI-Powered Intelligence
-            </div>
-            <h1 className="text-4xl font-black leading-tight tracking-tight text-foreground xl:text-5xl">
-              Every meeting,{' '}
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-400">
-                perfectly captured.
-              </span>
+            <h1 className="font-display text-4xl leading-[1.05] font-extrabold tracking-[-0.04em] text-balance text-foreground xl:text-5xl">
+              Meetings that write <span className="text-brand-gradient">their own minutes.</span>
             </h1>
-            <p className="mt-3 max-w-md text-base leading-relaxed text-muted-foreground">
-              Real-time transcription, AI summaries, action items, and team collaboration — all in one workspace.
+            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+              Live video, real-time transcription, AI summaries and action items — in one workspace.
             </p>
           </div>
 
-          {/* Feature list */}
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 p-3.5 backdrop-blur-sm"
+          <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {HIGHLIGHTS.map((item) => (
+              <li
+                key={item.title}
+                className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-card/50 p-3.5 backdrop-blur-sm"
               >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${f.bg}`}>
-                  <f.icon className={`h-4.5 w-4.5 ${f.color}`} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{f.title}</p>
-                  <p className="text-xs text-muted-foreground">{f.desc}</p>
-                </div>
-              </div>
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}>
+                  <item.icon className="size-[1.15rem]" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">{item.title}</span>
+                  <span className="block text-xs text-muted-foreground">{item.description}</span>
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
 
-        {/* ── Bottom: Trust strip ── */}
-        <div className="relative z-10 flex flex-wrap items-center gap-3">
-          {[
-            { icon: CheckCircle2, text: 'No credit card', color: 'text-emerald-400' },
-            { icon: CheckCircle2, text: 'Free to start', color: 'text-emerald-400' },
-            { icon: CheckCircle2, text: 'SOC 2 Compliant', color: 'text-emerald-400' },
-          ].map((t) => (
-            <div key={t.text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <t.icon className={`h-3.5 w-3.5 ${t.color}`} />
-              {t.text}
-            </div>
+        <ul className="relative z-10 flex flex-wrap items-center gap-x-5 gap-y-2">
+          {TRUST.map((text) => (
+            <li key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+              {text}
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
+      </aside>
 
-      {/* ── Right panel: Clerk form ── */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-background p-6 lg:p-10">
-        {/* Mobile logo */}
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 lg:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 overflow-hidden">
-            <Image src="/logo.png" alt="Smart Meet Logo" width={32} height={32} className="object-contain" />
-          </div>
-          <span className="font-bold text-foreground">Smart Meet</span>
-        </Link>
-
-        <div className="w-full max-w-sm">
-          {children}
+      {/* ── Form panel ── */}
+      <main className="relative flex flex-1 flex-col items-center justify-center p-6 lg:p-10">
+        <div
+          className="pointer-events-none absolute inset-0 lg:hidden"
+          aria-hidden="true"
+        >
+          <div className="absolute -top-24 left-1/2 h-64 w-96 -translate-x-1/2 rounded-full bg-primary/20 blur-[90px]" />
         </div>
-      </div>
+        <div className="relative mb-8 lg:hidden">
+          <Logo />
+        </div>
+        <div className="relative w-full max-w-sm">{children}</div>
+      </main>
     </div>
   );
 }

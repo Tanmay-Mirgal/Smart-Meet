@@ -1,5 +1,7 @@
 "use client";
 
+// Loaded here (not in the root layout) so only meeting rooms pay for Excalidraw's CSS.
+import "@excalidraw/excalidraw/index.css";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {

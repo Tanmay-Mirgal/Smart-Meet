@@ -1,61 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Plug,
-  ChevronRight,
-  CreditCard,
-  FileText,
-  ListChecks,
-} from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { Logo } from "@/components/brand/logo";
+import { APP_NAV_ITEMS, isNavItemActive } from "@/lib/app-nav";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/meetings", label: "Meetings", icon: CalendarDays },
-  { href: "/tasks", label: "Tasks Board", icon: ListChecks },
-  { href: "/minutes-of-meetings", label: "Minutes of Meetings", icon: FileText },
-  { href: "/integrations", label: "Integrations", icon: Plug },
-  { href: "/billing", label: "Billing", icon: CreditCard },
-];
+export const orgSwitcherAppearance = {
+  elements: {
+    rootBox: "w-full",
+    organizationSwitcherTrigger:
+      "w-full justify-start rounded-xl border border-border bg-background/60 px-3 py-2 text-sm transition-colors hover:bg-muted/60",
+  },
+} as const;
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+export const userButtonAppearance = {
+  elements: {
+    userButtonAvatarBox: "h-8 w-8 rounded-lg",
+  },
+} as const;
+
+export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-0.5">
-      {navItems.map((item) => {
-        const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+    <nav aria-label="Workspace" className="flex flex-col gap-0.5">
+      {APP_NAV_ITEMS.map((item) => {
+        const isActive = isNavItemActive(pathname, item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={onNavigate}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-all duration-150",
+              "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-150",
               isActive
-                ? "bg-primary/10 font-medium text-primary shadow-sm"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                ? "bg-sidebar-accent font-semibold text-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
             )}
           >
-            <span className="flex items-center gap-3">
-              <item.icon
-                className={cn(
-                  "h-4 w-4 transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
-                )}
+            {isActive ? (
+              <span
+                className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-gradient"
+                aria-hidden="true"
               />
-              {item.label}
-            </span>
-            {isActive && (
-              <ChevronRight className="h-3.5 w-3.5 text-primary/60" />
-            )}
+            ) : null}
+            <item.icon
+              className={cn(
+                "size-4 shrink-0 transition-colors",
+                isActive ? "text-brand" : "text-muted-foreground group-hover:text-foreground",
+              )}
+            />
+            {item.label}
           </Link>
         );
       })}
@@ -65,63 +63,31 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppSidebar() {
   return (
-    <>
-      <aside className="hidden h-screen w-64 shrink-0 self-start border-r border-border/60 bg-card/50 backdrop-blur-sm lg:sticky lg:top-0 lg:flex lg:flex-col">
-        {/* Logo */}
-        <div className="border-b border-border/60 px-4 py-5">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 overflow-hidden transition-colors group-hover:bg-primary/15">
-              <Image src="/logo.png" alt="Smart Meet Logo" width={36} height={36} className="object-contain" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-foreground">Smart Meet</p>
-              <p className="text-[11px] text-muted-foreground">
-                Realtime workspace
-              </p>
-            </div>
-          </Link>
-        </div>
+    <aside className="hidden h-screen w-64 shrink-0 self-start border-r border-sidebar-border bg-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
+      <div className="px-5 pt-5 pb-4">
+        <Logo href="/dashboard" caption="Workspace" />
+      </div>
 
-        {/* Org Switcher */}
-        <div className="border-b border-border/60 px-4 py-3">
-          <OrganizationSwitcher
-            hidePersonal
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                organizationSwitcherTrigger:
-                  "w-full justify-start border border-border/60 bg-background/60 px-3 py-2 rounded-lg text-sm hover:bg-muted/50 transition-colors",
-              },
-            }}
-          />
-        </div>
+      <div className="px-4 pb-4">
+        <OrganizationSwitcher hidePersonal appearance={orgSwitcherAppearance} />
+      </div>
 
-        {/* Nav */}
-        <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            Navigation
-          </p>
-          <NavLinks />
-        </div>
+      <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-2">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground/60 uppercase">
+          Navigation
+        </p>
+        <NavLinks />
+      </div>
 
-        {/* User */}
-        <div className="border-t border-border/60 px-4 py-4">
-          <div className="flex items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-muted/40">
-            <UserButton
-              appearance={{
-                elements: {
-                  userButtonAvatarBox:
-                    "h-8 w-8 rounded-lg border border-border/60",
-                },
-              }}
-            />
-            <div>
-              <p className="text-sm font-medium text-foreground">Account</p>
-              <p className="text-xs text-muted-foreground">Manage profile</p>
-            </div>
+      <div className="border-t border-sidebar-border p-4">
+        <div className="flex items-center gap-3 rounded-xl px-1 py-1">
+          <UserButton appearance={userButtonAppearance} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Account</p>
+            <p className="text-xs text-muted-foreground">Manage profile</p>
           </div>
         </div>
-      </aside>
-    </>
+      </div>
+    </aside>
   );
 }

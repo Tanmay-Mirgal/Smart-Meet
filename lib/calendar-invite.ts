@@ -58,7 +58,7 @@ export function buildIcsContent(event: CalendarInviteEvent, uid: string) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Meeting Bot//Calendar Invite//EN",
+    "PRODID:-//Meetup//Calendar Invite//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

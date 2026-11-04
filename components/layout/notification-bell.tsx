@@ -84,7 +84,7 @@ export function NotificationBell() {
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <span className="text-sm font-semibold text-foreground">Notifications</span>
           {unreadCount > 0 && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-brand">
               {unreadCount} unread
             </span>
           )}
@@ -120,7 +120,7 @@ export function NotificationBell() {
                   >
                     {/* Avatar */}
                     <Avatar className="mt-0.5 h-8 w-8 shrink-0 border border-border/50">
-                      <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">
+                      <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-brand">
                         {initials}
                       </AvatarFallback>
                     </Avatar>

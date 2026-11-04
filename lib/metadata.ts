@@ -1,27 +1,35 @@
 import type { Metadata } from "next";
 import { getPublicAppUrl } from "@/lib/public-app-url";
+import { PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
+import {
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+} from "@/lib/site";
 
-export const SITE_NAME = "Smart Meet";
-export const SITE_DESCRIPTION =
-  "Smart Meet — AI-powered meeting intelligence. Real-time transcription, instant AI summaries, action items, and team collaboration in one workspace. Free to start.";
-export const SITE_KEYWORDS = [
-  "smart meet",
-  "AI meeting assistant",
-  "meeting transcription",
-  "real-time transcription",
-  "AI meeting summaries",
-  "meeting notes",
-  "action items",
-  "team collaboration",
-  "meeting workspace",
-  "meeting intelligence",
-  "automated minutes",
-  "online meeting tool",
-];
+export { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME };
 
 function buildTitle(title: string) {
   return `${title} | ${SITE_NAME}`;
 }
+
+const INDEXABLE_ROBOTS = {
+  index: true,
+  follow: true,
+  googleBot: {
+    index: true,
+    follow: true,
+    "max-video-preview": -1,
+    "max-image-preview": "large",
+    "max-snippet": -1,
+  },
+} as const;
+
+const PRIVATE_ROBOTS = {
+  index: false,
+  follow: false,
+  googleBot: { index: false, follow: false },
+} as const;
 
 interface CreateMetadataOptions {
   title: string;
@@ -33,6 +41,8 @@ interface CreateMetadataOptions {
   index?: boolean;
   /** OG image path (relative). Defaults to /og-image.png */
   ogImage?: string;
+  /** Use the title verbatim instead of appending " | Meetup" (home page). */
+  absoluteTitle?: boolean;
 }
 
 export function createMetadata({
@@ -42,47 +52,27 @@ export function createMetadata({
   keywords = [],
   index = true,
   ogImage = "/og-image.png",
+  absoluteTitle = false,
 }: CreateMetadataOptions): Metadata {
   const siteUrl = getPublicAppUrl();
-  const canonicalUrl = `${siteUrl}${path}`;
+  const canonicalUrl = path === "/" ? siteUrl : `${siteUrl}${path}`;
   const fullOgImage = `${siteUrl}${ogImage}`;
-  const allKeywords = [...SITE_KEYWORDS, ...keywords];
+  const socialTitle = absoluteTitle ? title : buildTitle(title);
 
   return {
-    title: buildTitle(title),
+    // The root layout's `title.template` appends the site name for us.
+    title: absoluteTitle ? { absolute: title } : title,
     description,
-    keywords: allKeywords,
-    authors: [{ name: SITE_NAME, url: siteUrl }],
-    creator: SITE_NAME,
-    publisher: SITE_NAME,
-    metadataBase: new URL(siteUrl),
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    robots: index
-      ? {
-          index: true,
-          follow: true,
-          googleBot: {
-            index: true,
-            follow: true,
-            "max-video-preview": -1,
-            "max-image-preview": "large",
-            "max-snippet": -1,
-          },
-        }
-      : {
-          index: false,
-          follow: false,
-          googleBot: { index: false, follow: false },
-        },
+    keywords: [...SITE_KEYWORDS, ...keywords],
+    alternates: { canonical: canonicalUrl },
+    robots: index ? INDEXABLE_ROBOTS : PRIVATE_ROBOTS,
     openGraph: {
-      title: buildTitle(title),
+      title: socialTitle,
       description,
       siteName: SITE_NAME,
       type: "website",
       url: canonicalUrl,
-      locale: "en_US",
+      locale: "en_IN",
       images: [
         {
           url: fullOgImage,
@@ -94,11 +84,9 @@ export function createMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: buildTitle(title),
+      title: socialTitle,
       description,
       images: [fullOgImage],
-      creator: "@smartmeet",
-      site: "@smartmeet",
     },
   };
 }
@@ -115,17 +103,12 @@ export function websiteJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": `${siteUrl}/#website`,
     name: SITE_NAME,
     url: siteUrl,
     description: SITE_DESCRIPTION,
-    potentialAction: {
-      "@type": "SearchAction",
-      target: {
-        "@type": "EntryPoint",
-        urlTemplate: `${siteUrl}/meetings?q={search_term_string}`,
-      },
-      "query-input": "required name=search_term_string",
-    },
+    inLanguage: "en",
+    publisher: { "@id": `${siteUrl}/#organization` },
   };
 }
 
@@ -134,17 +117,16 @@ export function organizationJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": `${siteUrl}/#organization`,
     name: SITE_NAME,
     url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
-    description: SITE_DESCRIPTION,
-    foundingDate: "2024",
-    contactPoint: {
-      "@type": "ContactPoint",
-      contactType: "customer support",
-      availableLanguage: ["English"],
+    logo: {
+      "@type": "ImageObject",
+      url: `${siteUrl}/logo.png`,
+      width: 512,
+      height: 512,
     },
-    sameAs: [],
+    description: SITE_DESCRIPTION,
   };
 }
 
@@ -153,24 +135,48 @@ export function softwareAppJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
+    "@id": `${siteUrl}/#software`,
     name: SITE_NAME,
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     url: siteUrl,
+    image: `${siteUrl}/og-image.png`,
     description: SITE_DESCRIPTION,
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
+    offers: [
+      {
+        "@type": "Offer",
+        name: "Free",
+        price: "0",
+        priceCurrency: "INR",
+      },
+      {
+        "@type": "Offer",
+        name: "Pro",
+        price: String(PRO_PRICE.inr),
+        priceCurrency: "INR",
+        description: PRO_FEATURES.join(", "),
+      },
+    ],
     featureList: [
-      "Real-time meeting transcription",
+      "Live video meeting rooms",
+      "Real-time transcription in Hindi, Marathi and English",
       "AI-generated meeting summaries",
       "Action item tracking",
-      "Meeting minutes generation",
-      "Team collaboration workspace",
-      "Multi-language support",
+      "Minutes of meeting documents",
+      "Google Calendar and Notion integrations",
     ],
+  };
+}
+
+export function faqJsonLd(items: ReadonlyArray<{ question: string; answer: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
   };
 }
 

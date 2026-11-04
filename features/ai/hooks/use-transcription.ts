@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TranscriptionMode } from "@/lib/transcription/modes";
 
 export type TranscriptLine = {
   id: string;
@@ -11,19 +12,15 @@ export type TranscriptLine = {
   timestamp: number;
 };
 
-export type TranscriptionMode =
-  | "auto"
-  | "hindi_english_marathi"
-  | "hindi_english"
-  | "hindi"
-  | "marathi"
-  | "english";
+export type { TranscriptionMode };
 
 const PROCESSOR_BUFFER_SIZE = 4096;
 const VOICE_RMS_THRESHOLD = 0.02;
-const VOICE_HANGOVER_FRAMES = 12; // ~1 second of silence
+const VOICE_HANGOVER_FRAMES = 10; // ~0.85 seconds of silence ends an utterance
 const MIN_VOICED_AUDIO_MS = 350;
-const MAX_CHUNK_DURATION_SECONDS = 15;
+const MAX_CHUNK_DURATION_SECONDS = 12;
+// Speech models resample to 16 kHz anyway; sending 16 kHz cuts each upload to about a third.
+const TARGET_SAMPLE_RATE = 16_000;
 
 type AudioContextConstructor = typeof AudioContext;
 
@@ -47,6 +44,29 @@ function mergeFloat32Chunks(chunks: Float32Array[], totalLength: number) {
   }
 
   return merged;
+}
+
+/** Box-filter downsample (averaging doubles as a cheap anti-alias filter). */
+function downsample(samples: Float32Array, inputRate: number) {
+  if (inputRate <= TARGET_SAMPLE_RATE) {
+    return { samples, sampleRate: inputRate };
+  }
+
+  const ratio = inputRate / TARGET_SAMPLE_RATE;
+  const outputLength = Math.floor(samples.length / ratio);
+  const output = new Float32Array(outputLength);
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const start = Math.floor(index * ratio);
+    const end = Math.min(samples.length, Math.floor((index + 1) * ratio));
+    let sum = 0;
+    for (let cursor = start; cursor < end; cursor += 1) {
+      sum += samples[cursor] ?? 0;
+    }
+    output[index] = end > start ? sum / (end - start) : 0;
+  }
+
+  return { samples: output, sampleRate: TARGET_SAMPLE_RATE };
 }
 
 function encodeWav(samples: Float32Array, sampleRate: number) {
@@ -187,7 +207,8 @@ export function useTranscription({
     voicedSampleCountRef.current = 0;
     hasSpeechRef.current = false;
 
-    const wavBlob = encodeWav(merged, audioContext.sampleRate);
+    const downsampled = downsample(merged, audioContext.sampleRate);
+    const wavBlob = encodeWav(downsampled.samples, downsampled.sampleRate);
     await sendChunk(wavBlob);
   }, [sendChunk]);
 

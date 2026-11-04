@@ -184,7 +184,7 @@ export function MeetingDetailsPage({ meetingId }: { meetingId: Id<"meetings"> })
               <span>{recordings.length} recording{recordings.length !== 1 ? "s" : ""}</span>
             </div>
             {hasSummary && (
-              <Badge className="border-primary/20 bg-primary/10 text-primary">
+              <Badge className="border-primary/20 bg-primary/10 text-brand">
                 Email-ready MoM available
               </Badge>
             )}
@@ -315,7 +315,7 @@ export function MeetingDetailsPage({ meetingId }: { meetingId: Id<"meetings"> })
                     >
                       {!isSame ? (
                         <Avatar className="h-7 w-7 shrink-0 border border-border/50">
-                          <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">
+                          <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-brand">
                             {line.speakerName.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
@@ -402,7 +402,7 @@ export function MeetingDetailsPage({ meetingId }: { meetingId: Id<"meetings"> })
                                 <h2 className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground" {...props} />
                               ),
                               ul: ({ node, ...props }: React.HTMLAttributes<HTMLUListElement> & { node?: unknown }) => (
-                                <ul className="mb-3 ml-3 list-disc space-y-1.5 text-foreground/85 marker:text-primary/70" {...props} />
+                                <ul className="mb-3 ml-3 list-disc space-y-1.5 text-foreground/85 marker:text-brand/70" {...props} />
                               ),
                               ol: ({ node, ...props }: React.HTMLAttributes<HTMLOListElement> & { node?: unknown }) => (
                                 <ol className="mb-3 ml-3 list-decimal space-y-1.5 text-foreground/85" {...props} />

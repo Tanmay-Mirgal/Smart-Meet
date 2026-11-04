@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { TaskBoard } from "@/features/tasks/components/task-board";
 import { taskService } from "@/features/tasks/services/task-service";
+import { PageHeader, HeaderStat } from "@/components/shared/page-header";
 
 const UNASSIGNED_VALUE = "__unassigned__";
 
@@ -82,43 +83,14 @@ export function TasksPage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-linear-to-br from-card via-card to-muted/30 p-6 lg:p-8">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/3 h-32 w-64 rounded-full bg-sky-500/5 blur-3xl" />
-
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-                <KanbanSquare className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Workflow board
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-              Tasks Board
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Track AI-created and manual follow-ups in a Kanban board, assign ownership, and move work from open to done.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-4 py-2.5 backdrop-blur-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <KanbanSquare className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xl font-bold tabular-nums text-foreground">
-                  {tasks.length}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Total tasks</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={KanbanSquare}
+        eyebrow="Workflow board"
+        title="Tasks Board"
+        description="Track AI-created and manual follow-ups in a Kanban board, assign ownership, and move work from open to done."
+      >
+        <HeaderStat icon={KanbanSquare} value={tasks.length} label="Total tasks" />
+      </PageHeader>
 
       <Card className="border-border/60 shadow-sm">
         <CardHeader>

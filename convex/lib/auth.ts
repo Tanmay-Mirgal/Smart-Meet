@@ -17,7 +17,7 @@ export async function requireIdentity(ctx: ConvexCtx) {
 export function getIdentityName(
   identity: Awaited<ReturnType<typeof requireIdentity>>,
 ) {
-  return identity.name ?? identity.email ?? "Meeting Bot User";
+  return identity.name ?? identity.email ?? "Meetup User";
 }
 
 export async function getCurrentUserRecord(

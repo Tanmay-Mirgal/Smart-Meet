@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingBlock } from "@/components/shared/loading-block";
 import { integrationsService } from "@/features/integrations/services/integrations-service";
 import { cn } from "@/lib/utils";
+import { PageHeader, HeaderStat } from "@/components/shared/page-header";
 
 /* ─── helpers ───────────────────────────────────────────── */
 
@@ -67,7 +68,7 @@ function FeatureItem({ icon: Icon, text }: { icon: React.ElementType; text: stri
   return (
     <div className="flex items-start gap-2.5">
       <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-        <Icon className="h-3 w-3 text-primary" />
+        <Icon className="h-3 w-3 text-brand" />
       </div>
       <span className="text-sm leading-relaxed text-muted-foreground">{text}</span>
     </div>
@@ -153,49 +154,26 @@ export function IntegrationsPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
 
-      {/* ── Hero Header ── */}
-      <div className="relative overflow-hidden rounded-xl border border-border/60 bg-linear-to-br from-card via-card to-muted/30 p-6 lg:p-8">
-        <div className="pointer-events-none absolute -right-8 -top-8 h-48 w-48 rounded-full bg-violet-500/5 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/4 h-32 w-64 rounded-full bg-primary/5 blur-3xl" />
-        <div className="relative">
-          <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
-              <Plug className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Integrations
-            </span>
+      <PageHeader
+        icon={Plug}
+        eyebrow="Integrations"
+        title="Connect team workflows"
+        description="Keep scheduling and meeting knowledge connected. Google Calendar covers scheduling, while Notion gives every meeting a durable home for summaries, decisions, and action items."
+      >
+        <HeaderStat icon={Zap} value={`${connectedCount} / 2`} label="integrations active" />
+        {isGoogleConnected && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-medium text-emerald-400">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Google Calendar
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-            Connect team workflows
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Keep scheduling and meeting knowledge connected. Google Calendar covers scheduling,
-            while Notion gives every meeting a durable home for summaries, decisions, and action items.
-          </p>
-
-          {/* Status strip */}
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-3.5 py-2 text-sm backdrop-blur-sm">
-              <Zap className="h-4 w-4 text-primary" />
-              <span className="font-medium text-foreground">{connectedCount} / 2</span>
-              <span className="text-muted-foreground">integrations active</span>
-            </div>
-            {isGoogleConnected && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                <CalendarDays className="h-3.5 w-3.5" />
-                Google Calendar
-              </div>
-            )}
-            {isNotionConnected && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                <BookText className="h-3.5 w-3.5" />
-                Notion
-              </div>
-            )}
+        )}
+        {isNotionConnected && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-medium text-emerald-400">
+            <BookText className="h-3.5 w-3.5" />
+            Notion
           </div>
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       {/* ── Integration Cards ── */}
       <div className="grid gap-6">

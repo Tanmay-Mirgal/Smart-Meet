@@ -1,10 +1,32 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { CreateOrganization, useOrganization, useAuth } from '@clerk/nextjs';
-import { Target, Cpu, Building2, CheckCircle2, ChevronRight, Languages, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CreateOrganization, useAuth, useOrganization } from "@clerk/nextjs";
+import { Building2, CheckCircle2, ChevronRight, Languages, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { createOrganizationAppearance } from "@/lib/clerk-appearance";
+import {
+  readStoredTranscriptionMode,
+  storeTranscriptionMode,
+  TRANSCRIPTION_MODE_OPTIONS,
+  isTranscriptionMode,
+} from "@/features/ai/lib/transcription-modes";
+import type { TranscriptionMode } from "@/features/ai/hooks/use-transcription";
+import { cn } from "@/lib/utils";
+
+const USE_CASES = [
+  { id: "product", title: "Product & Engineering", desc: "Sprint planning, design reviews, standups." },
+  { id: "sales", title: "Sales & Marketing", desc: "Client pitches, campaign strategy, discovery." },
+  { id: "leadership", title: "Executive Leadership", desc: "Board meetings, all-hands, strategic alignment." },
+  { id: "consulting", title: "Consulting & Agencies", desc: "Client workshops, interviews, deliverables." },
+] as const;
+
+const STEPS = [
+  { num: 1, label: "Use case", icon: Target },
+  { num: 2, label: "Language", icon: Languages },
+  { num: 3, label: "Workspace", icon: Building2 },
+] as const;
 
 export function OnboardingFlow() {
   const [step, setStep] = useState(1);
@@ -12,31 +34,32 @@ export function OnboardingFlow() {
   const { isLoaded: isOrgLoaded, organization } = useOrganization();
   const { isLoaded: isAuthLoaded, userId } = useAuth();
 
-  // Local state for Step 1
   const [selectedUseCase, setSelectedUseCase] = useState<string | null>(null);
+  const [language, setLanguage] = useState<TranscriptionMode>(
+    () => readStoredTranscriptionMode() ?? "hindi_english_marathi",
+  );
 
-  // Local state for Step 2
-  const [autoJoin, setAutoJoin] = useState(true);
-  const [language, setLanguage] = useState('English');
-
-  // Redirect to sign in if not authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthLoaded && !userId) {
-      router.push('/sign-in');
+      router.push("/sign-in");
     }
   }, [isAuthLoaded, userId, router]);
 
-  // If organization exists, we should be done!
-  React.useEffect(() => {
+  // An existing organization means onboarding is already done.
+  useEffect(() => {
     if (isOrgLoaded && organization) {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   }, [isOrgLoaded, organization, router]);
 
   if (!isAuthLoaded || !isOrgLoaded) {
     return (
-      <div className="w-full flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className="flex min-h-[60vh] w-full items-center justify-center">
+        <div
+          className="size-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"
+          role="status"
+          aria-label="Loading"
+        />
       </div>
     );
   }
@@ -45,209 +68,191 @@ export function OnboardingFlow() {
     return null;
   }
 
-  const useCases = [
-    { id: '1', title: 'Product & Engineering', desc: 'Sprint planning, design reviews, standups.' },
-    { id: '2', title: 'Sales & Marketing', desc: 'Client pitches, campaign strategy, discovery.' },
-    { id: '3', title: 'Executive Leadership', desc: 'Board meetings, all-hands, strategic alignment.' },
-    { id: '4', title: 'Consulting & Agencies', desc: 'Client workshops, interviews, deliverables.' },
-  ];
+  const handleLanguageContinue = () => {
+    storeTranscriptionMode(language);
+    setStep(3);
+  };
 
   return (
-    <div className="w-full flex justify-center animate-in fade-in duration-500">
-      <div className="w-full max-w-2xl bg-card rounded-xl p-8 sm:p-12 border border-border shadow-md relative overflow-hidden">
-        
-        {/* Progress Bar Header */}
-        <div className="flex items-center justify-between mb-12 relative z-10">
-          {[
-            { num: 1, label: "Use Case", icon: Target },
-            { num: 2, label: "Preferences", icon: Cpu },
-            { num: 3, label: "Organization", icon: Building2 },
-          ].map((s) => {
+    <div className="flex w-full justify-center animate-in fade-in duration-500">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-border bg-card/80 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-12">
+        {/* Progress */}
+        <ol className="relative mb-12 flex items-center justify-between" aria-label="Onboarding progress">
+          <div className="absolute top-5 right-10 left-10 -z-10 h-0.5 bg-border" aria-hidden="true" />
+          <div
+            className="absolute top-5 left-10 -z-10 h-0.5 bg-primary transition-all duration-500 ease-in-out"
+            style={{ width: `calc((100% - 5rem) * ${(step - 1) / (STEPS.length - 1)})` }}
+            aria-hidden="true"
+          />
+          {STEPS.map((s) => {
             const Icon = s.icon;
             const isActive = step === s.num;
             const isCompleted = step > s.num;
             return (
-              <div key={s.num} className="flex flex-col items-center gap-2 relative z-10">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                  isActive 
-                    ? 'border-primary bg-primary text-primary-foreground shadow-sm' 
-                    : isCompleted 
-                      ? 'border-primary bg-primary/20 text-primary' 
-                      : 'border-border bg-background text-muted-foreground'
-                }`}>
-                  {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                </div>
-                <span className={`text-xs font-bold tracking-tight ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <li
+                key={s.num}
+                aria-current={isActive ? "step" : undefined}
+                className="relative z-10 flex flex-col items-center gap-2"
+              >
+                <span
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-full border-2 transition-all",
+                    isActive && "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/40",
+                    isCompleted && "border-primary bg-primary/20 text-brand",
+                    !isActive && !isCompleted && "border-border bg-background text-muted-foreground",
+                  )}
+                >
+                  {isCompleted ? <CheckCircle2 className="size-5" /> : <Icon className="size-5" />}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold tracking-tight",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
                   {s.label}
                 </span>
-              </div>
+              </li>
             );
           })}
-          {/* Connecting lines */}
-          <div className="absolute top-5 left-10 right-10 h-[2px] bg-border -z-10" />
-          <div 
-            className="absolute top-5 left-10 h-[2px] bg-primary transition-all duration-500 ease-in-out -z-10" 
-            style={{ width: `${(step - 1) * 50}%` }} 
-          />
-        </div>
+        </ol>
 
-        {/* --- STEP 1: USE CASE --- */}
+        {/* Step 1 — use case */}
         {step === 1 && (
-          <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
+          <div className="animate-in slide-in-from-right-4 fade-in space-y-8 duration-300">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">How will you use MeetMind?</h2>
-              <p className="text-muted-foreground font-medium text-sm">Select your primary use case to pre-configure your AI agents.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               {useCases.map((uc) => (
-                <div 
-                  key={uc.id}
-                  onClick={() => setSelectedUseCase(uc.id)}
-                  className={`p-5 rounded-xl border-2 transition-all cursor-pointer ${
-                    selectedUseCase === uc.id 
-                      ? 'border-primary bg-primary/5 shadow-sm transform scale-[1.02]' 
-                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-foreground text-sm">{uc.title}</h3>
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                      selectedUseCase === uc.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'
-                    }`}>
-                      {selectedUseCase === uc.id && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {uc.desc}
-                  </p>
-                </div>
-              ))}
+              <h2 className="mb-2 font-display text-2xl font-bold tracking-tight text-foreground">
+                How will you use Meetup?
+              </h2>
+              <p className="text-sm font-medium text-muted-foreground">
+                Pick the closest fit. You can run any kind of meeting later.
+              </p>
             </div>
 
-            <Button 
-              disabled={!selectedUseCase} 
-              onClick={() => setStep(2)} 
-              className="w-full h-12 rounded-xl text-base shadow-sm"
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" role="group" aria-label="Use case">
+              {USE_CASES.map((useCase) => {
+                const selected = selectedUseCase === useCase.id;
+                return (
+                  <button
+                    key={useCase.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSelectedUseCase(useCase.id)}
+                    className={cn(
+                      "rounded-2xl border-2 p-5 text-left transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                      selected
+                        ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                        : "border-border hover:border-primary/50 hover:bg-muted/50",
+                    )}
+                  >
+                    <span className="mb-2 flex items-start justify-between gap-3">
+                      <span className="text-sm font-bold text-foreground">{useCase.title}</span>
+                      <span
+                        className={cn(
+                          "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                          selected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background",
+                        )}
+                      >
+                        {selected && <CheckCircle2 className="size-3.5" />}
+                      </span>
+                    </span>
+                    <span className="block text-xs leading-relaxed text-muted-foreground">{useCase.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <Button
+              disabled={!selectedUseCase}
+              onClick={() => setStep(2)}
+              className="h-12 w-full rounded-xl text-base font-semibold"
             >
-              Continue <ChevronRight className="w-4 h-4 ml-2" />
+              Continue <ChevronRight className="ml-1 size-4" />
             </Button>
           </div>
         )}
 
-        {/* --- STEP 2: PREFERENCES --- */}
+        {/* Step 2 — language */}
         {step === 2 && (
-          <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
+          <div className="animate-in slide-in-from-right-4 fade-in space-y-8 duration-300">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">AI Preferences</h2>
-              <p className="text-muted-foreground font-medium text-sm">Customize how the intelligence agents behave during your meetings.</p>
+              <h2 className="mb-2 font-display text-2xl font-bold tracking-tight text-foreground">
+                Spoken language
+              </h2>
+              <p className="text-sm font-medium text-muted-foreground">
+                This is the default transcription mode in your meeting rooms. You can change it per
+                meeting at any time.
+              </p>
             </div>
-            
-            <div className="space-y-4">
-              {/* Auto Join */}
-              <div 
-                onClick={() => setAutoJoin(!autoJoin)}
-                className="flex items-start gap-4 p-5 bg-card border border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
-              >
-                <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                  autoJoin ? 'bg-primary border-primary' : 'border-border bg-background'
-                }`}>
-                  {autoJoin && <div className="w-2.5 h-2.5 bg-primary-foreground rounded-full" />}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4 text-foreground" />
-                    <h3 className="font-bold text-sm text-foreground">Auto-join Calendar Events</h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Allow MeetMind&apos;s bot to automatically join and transcribe meetings marked on your integrated calendar.
-                  </p>
-                </div>
-              </div>
 
-               {/* Language */}
-               <div className="flex items-start gap-4 p-5 bg-card border border-border rounded-xl">
-                <div className="w-6 h-6 rounded-full border border-transparent shrink-0 mt-0.5" />
-                <div className="w-full">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Languages className="w-4 h-4 text-foreground" />
-                    <h3 className="font-bold text-sm text-foreground">Primary Spoken Language</h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                    The bot will optimize transcription models for this language.
-                  </p>
-                  <select 
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full p-3 bg-secondary border border-transparent rounded-xl text-sm font-medium text-foreground focus:ring-2 focus:ring-primary/20 outline-none"
-                  >
-                    <option>English</option>
-                    <option>Spanish</option>
-                    <option>French</option>
-                    <option>German</option>
-                  </select>
-                </div>
-              </div>
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <label htmlFor="onboarding-language" className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
+                <Languages className="size-4 text-brand" />
+                Transcription mode
+              </label>
+              <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+                Meetup tunes its speech recognition for the languages you pick.
+              </p>
+              <select
+                id="onboarding-language"
+                value={language}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (isTranscriptionMode(value)) setLanguage(value);
+                }}
+                className="w-full rounded-xl border border-transparent bg-secondary p-3 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {TRANSCRIPTION_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setStep(1)} 
-                className="flex-1 h-12 rounded-xl"
-              >
+              <Button variant="outline" onClick={() => setStep(1)} className="h-12 flex-1 rounded-xl">
                 Back
               </Button>
-              <Button 
-                onClick={() => setStep(3)} 
-                className="flex-2 h-12 rounded-xl text-base shadow-sm"
-              >
-                Continue <ChevronRight className="w-4 h-4 ml-2" />
+              <Button onClick={handleLanguageContinue} className="h-12 flex-[2] rounded-xl text-base font-semibold">
+                Continue <ChevronRight className="ml-1 size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* --- STEP 3: CREATE ORGANIZATION --- */}
+        {/* Step 3 — organization */}
         {step === 3 && (
-          <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300 flex flex-col items-center text-center">
+          <div className="animate-in slide-in-from-right-4 fade-in flex flex-col items-center space-y-8 text-center duration-300">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Establish Your Workspace</h2>
-              <p className="text-muted-foreground font-medium text-sm mb-6 max-w-md mx-auto">
-                Invite your team to collaborate on transcripts, action items, and insights across your entire organization.
+              <h2 className="mb-2 font-display text-2xl font-bold tracking-tight text-foreground">
+                Create your workspace
+              </h2>
+              <p className="mx-auto mb-6 max-w-md text-sm font-medium text-muted-foreground">
+                Invite your team to collaborate on transcripts, action items and insights across your
+                whole organization.
               </p>
             </div>
-            
-            <div className="w-full max-w-md mx-auto p-2 bg-card border border-border rounded-xl shadow-sm">
-              <CreateOrganization 
+
+            <div className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-2 shadow-sm">
+              <CreateOrganization
                 routing="hash"
                 afterCreateOrganizationUrl="/dashboard"
-                appearance={{
-                  elements: {
-                    rootBox: "w-full flex justify-center shadow-none",
-                    card: "shadow-none w-full bg-transparent border-none",
-                    headerTitle: "hidden",     // Hide clerk's default title
-                    headerSubtitle: "hidden",  // Hide clerk's default subtitle
-                    formButtonPrimary: "bg-primary hover:bg-primary/90 text-primary-foreground font-medium w-full rounded-xl py-3 h-auto shadow-sm",
-                    formFieldInput: "bg-secondary border-transparent focus:ring-2 focus:ring-primary/20 rounded-xl h-11",
-                    formFieldLabel: "text-foreground font-semibold text-sm mb-1.5",
-                    logoImage: "hidden",       // Hide logo inside org creator
-                    footerActionLink: "text-primary hover:text-primary/80 font-medium"
-                  }
-                }}
+                appearance={createOrganizationAppearance}
               />
             </div>
-            
-            <button 
+
+            <button
               type="button"
-              onClick={() => setStep(2)} 
-              className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mt-4"
+              onClick={() => setStep(2)}
+              className="mt-4 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
-              Wait, go back to Preferences
+              Back to language
             </button>
           </div>
         )}
-
       </div>
     </div>
   );

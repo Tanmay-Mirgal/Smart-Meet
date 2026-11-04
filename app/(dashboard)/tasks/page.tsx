@@ -3,7 +3,7 @@ import { createMetadata } from "@/lib/metadata";
 
 export const metadata = createMetadata({
   title: "Tasks Board",
-  description: "Track meeting follow-ups and action items from every Smart Meet session in real-time.",
+  description: "Track meeting follow-ups and action items from every Meetup session in real-time.",
   path: "/tasks",
   index: false,
 });

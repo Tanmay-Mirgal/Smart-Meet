@@ -35,9 +35,12 @@ import { MeetingSidePanel } from "@/features/meeting/components/meeting-side-pan
 import { MeetingWhiteboard } from "@/features/meeting/components/meeting-whiteboard";
 import { MeetingReactionsOverlay } from "@/features/meeting/components/meeting-reactions-overlay";
 import type { MeetingReactionEmoji } from "@/features/meeting/lib/reactions";
+import {
+  readStoredTranscriptionMode,
+  storeTranscriptionMode,
+} from "@/features/ai/lib/transcription-modes";
 
 const AUTO_SUMMARY_INTERVAL_MS = 5 * 60 * 1000;
-const TRANSCRIPTION_MODE_STORAGE_KEY = "meeting-bot-transcription-mode";
 const RECORDING_TIMESLICE_MS = 1000;
 
 type RecorderFormat = {
@@ -80,17 +83,11 @@ function getDefaultTranscriptionMode(): TranscriptionMode {
     return "auto";
   }
 
-  const storedMode = window.localStorage.getItem(TRANSCRIPTION_MODE_STORAGE_KEY);
+  const storedMode = readStoredTranscriptionMode();
   if (storedMode === "auto") {
     return "hindi_english_marathi";
   }
-  if (
-    storedMode === "hindi_english_marathi" ||
-    storedMode === "hindi_english" ||
-    storedMode === "hindi" ||
-    storedMode === "marathi" ||
-    storedMode === "english"
-  ) {
+  if (storedMode) {
     return storedMode;
   }
 
@@ -281,10 +278,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        TRANSCRIPTION_MODE_STORAGE_KEY,
-        transcriptionMode,
-      );
+      storeTranscriptionMode(transcriptionMode);
     }
   }, [transcriptionMode]);
 
@@ -764,7 +758,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
           {/* Left: title + status */}
           <div className="flex min-w-0 items-center gap-2.5">
             <h1 className="truncate text-sm font-semibold text-foreground lg:text-base">{meeting.title}</h1>
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase text-primary">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase text-brand">
               <Radio className="h-3 w-3" />
               <span>{meeting.status}</span>
             </div>
@@ -869,7 +863,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                     onClick={() => setFocusMode((cur) => !cur)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                       focusMode
-                        ? "border-primary/40 bg-primary/10 text-primary"
+                        ? "border-primary/40 bg-primary/10 text-brand"
                         : "border-border bg-background text-foreground hover:bg-muted"
                     }`}
                   >
@@ -877,7 +871,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                       <Focus className="h-4 w-4" />
                       <span>Focus mode</span>
                     </div>
-                    <span className={`text-xs font-medium ${ focusMode ? "text-primary" : "text-muted-foreground" }`}>
+                    <span className={`text-xs font-medium ${ focusMode ? "text-brand" : "text-muted-foreground" }`}>
                       {focusMode ? "On" : "Off"}
                     </span>
                   </button>
@@ -887,7 +881,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                     onClick={() => setCompactRail((cur) => !cur)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                       compactRail
-                        ? "border-primary/40 bg-primary/10 text-primary"
+                        ? "border-primary/40 bg-primary/10 text-brand"
                         : "border-border bg-background text-foreground hover:bg-muted"
                     }`}
                   >
@@ -895,7 +889,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                       <Pin className="h-4 w-4" />
                       <span>Compact rail</span>
                     </div>
-                    <span className={`text-xs font-medium ${ compactRail ? "text-primary" : "text-muted-foreground" }`}>
+                    <span className={`text-xs font-medium ${ compactRail ? "text-brand" : "text-muted-foreground" }`}>
                       {compactRail ? "On" : "Off"}
                     </span>
                   </button>
@@ -905,7 +899,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                     onClick={() => setShowFloatingTranscript((cur) => !cur)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                       showFloatingTranscript
-                        ? "border-primary/40 bg-primary/10 text-primary"
+                        ? "border-primary/40 bg-primary/10 text-brand"
                         : "border-border bg-background text-foreground hover:bg-muted"
                     }`}
                   >
@@ -913,7 +907,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                       <Subtitles className="h-4 w-4" />
                       <span>Floating transcript</span>
                     </div>
-                    <span className={`text-xs font-medium ${ showFloatingTranscript ? "text-primary" : "text-muted-foreground" }`}>
+                    <span className={`text-xs font-medium ${ showFloatingTranscript ? "text-brand" : "text-muted-foreground" }`}>
                       {showFloatingTranscript ? "On" : "Off"}
                     </span>
                   </button>
@@ -937,7 +931,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                     disabled={!canUseWhiteboard || (hasActivePresentation && !isWhiteboardOpen)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                       isWhiteboardOpen
-                        ? "border-primary/40 bg-primary/10 text-primary"
+                        ? "border-primary/40 bg-primary/10 text-brand"
                         : "border-border bg-background text-foreground hover:bg-muted"
                     } ${
                       !canUseWhiteboard || (hasActivePresentation && !isWhiteboardOpen)
@@ -949,7 +943,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                       <PenSquare className="h-4 w-4" />
                       <span>Shared whiteboard</span>
                     </div>
-                    <span className={`text-xs font-medium ${ isWhiteboardOpen ? "text-primary" : "text-muted-foreground" }`}>
+                    <span className={`text-xs font-medium ${ isWhiteboardOpen ? "text-brand" : "text-muted-foreground" }`}>
                       {isWhiteboardOpen ? `Live by ${whiteboardOwnerLabel}` : "Off"}
                     </span>
                   </button>
@@ -974,7 +968,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                             onClick={() => setTranscriptDock(pos)}
                             className={`rounded-md border px-2 py-1.5 text-xs capitalize transition-colors ${
                               transcriptDock === pos
-                                ? "border-primary/40 bg-primary/10 text-primary"
+                                ? "border-primary/40 bg-primary/10 text-brand"
                                 : "border-border text-muted-foreground hover:bg-muted"
                             }`}
                           >
@@ -1105,7 +1099,7 @@ export function MeetingRoomPage({ meetingId }: { meetingId: Id<"meetings"> }) {
                         <div className="flex items-center justify-between border-b border-border/60 bg-background/95 px-4 py-2.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1 text-xs font-medium text-foreground shadow-sm">
-                              <PenSquare className="h-3.5 w-3.5 text-primary" />
+                              <PenSquare className="h-3.5 w-3.5 text-brand" />
                               Shared whiteboard
                             </div>
                             <div className="inline-flex items-center rounded-full bg-primary/8 px-3 py-1 text-xs text-muted-foreground">

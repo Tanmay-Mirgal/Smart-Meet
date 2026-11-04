@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
-import "@excalidraw/excalidraw/index.css";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { dark } from "@clerk/ui/themes";
-import { Providers } from "@/components/providers";
-import { SyncUserWithConvex } from "@/components/sync-user-with-convex";
 import {
   SITE_NAME,
   SITE_DESCRIPTION,
@@ -16,27 +13,36 @@ import {
   organizationJsonLd,
   softwareAppJsonLd,
 } from "@/lib/metadata";
+import { BRAND_COLORS, SITE_TAGLINE } from "@/lib/site";
 import { getPublicAppUrl } from "@/lib/public-app-url";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const manrope = Manrope({
   subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
 });
 
 const siteUrl = getPublicAppUrl();
 
+export const viewport: Viewport = {
+  themeColor: BRAND_COLORS.ink,
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  applicationName: SITE_NAME,
   title: {
     template: `%s | ${SITE_NAME}`,
-    default: SITE_NAME,
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
   },
   description: SITE_DESCRIPTION,
   keywords: SITE_KEYWORDS,
@@ -44,15 +50,7 @@ export const metadata: Metadata = {
   creator: SITE_NAME,
   publisher: SITE_NAME,
   category: "Technology",
-  icons: {
-    icon: [
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
-      { url: "/icon.png", type: "image/png", sizes: "192x192" },
-      { url: "/bot.ico", rel: "shortcut icon" },
-    ],
-    apple: "/icon.png",
-    shortcut: "/icon.png",
-  },
+  // Favicons live next to this file: app/favicon.ico, app/icon.svg, app/apple-icon.png
   manifest: "/manifest.json",
   alternates: {
     canonical: siteUrl,
@@ -69,28 +67,26 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
     siteName: SITE_NAME,
     type: "website",
     url: siteUrl,
-    locale: "en_US",
+    locale: "en_IN",
     images: [
       {
         url: `${siteUrl}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: `${SITE_NAME} — AI-powered meeting intelligence`,
+        alt: `${SITE_NAME} — ${SITE_TAGLINE}`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
     images: [`${siteUrl}/og-image.png`],
-    creator: "@smartmeet",
-    site: "@smartmeet",
   },
   verification: {
     // Add your Google Search Console, Bing, Yandex tokens here when you have them
@@ -109,18 +105,20 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         theme: dark,
+        variables: {
+          colorPrimary: BRAND_COLORS.primary,
+          colorBackground: "#15131f",
+          borderRadius: "0.75rem",
+        },
       }}
     >
       <TooltipProvider>
         <html
           lang="en"
           className={cn(
-            "h-full dark",
-            "antialiased",
-            geistSans.variable,
-            geistMono.variable,
-            "font-sans",
+            "h-full dark antialiased font-sans",
             inter.variable,
+            manrope.variable,
           )}
           suppressHydrationWarning
         >
@@ -140,10 +138,7 @@ export default function RootLayout({
             />
           </head>
           <body className="min-h-full flex flex-col" suppressHydrationWarning>
-            <Providers>
-              <SyncUserWithConvex />
-              {children}
-            </Providers>
+            {children}
           </body>
         </html>
       </TooltipProvider>

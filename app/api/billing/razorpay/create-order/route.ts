@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         orgId,
         userId: clerkAuth.userId,
         plan: "pro",
-        product: "Smart Meet Pro",
+        product: "Meetup Pro",
       },
     });
 

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="mus-t" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9277FF"/>
+      <stop offset="1" stop-color="#4A34DA"/>
+    </linearGradient>
+    <linearGradient id="mus-w" x1="35" y1="10" x2="45" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFCB70"/>
+      <stop offset="1" stop-color="#FF7552"/>
+    </linearGradient>
+    <radialGradient id="mus-g" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(18 8) rotate(50) scale(52)">
+      <stop stop-color="#fff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#mus-t)"/>
+  <rect width="64" height="64" rx="15" fill="url(#mus-g)"/>
+  <g>
+    <path d="M16 49V35a8 8 0 0 1 16 0v14M32 35a8 8 0 0 1 16 0v14" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="24" cy="15.5" r="5.2" fill="#fff"/>
+    <circle cx="40" cy="15.5" r="5.2" fill="url(#mus-w)"/>
+  </g>
+</svg>

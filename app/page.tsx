@@ -1,40 +1,52 @@
-import React from "react";
 import { Navbar } from "@/components/home/navbar";
 import { Hero } from "@/components/home/hero";
 import { Features } from "@/components/home/features";
-import { Footer } from "@/components/home/footer";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { createMetadata, websiteJsonLd, softwareAppJsonLd } from "@/lib/metadata";
+import { HowItWorks } from "@/components/home/how-it-works";
+import { Languages } from "@/components/home/languages";
+import { Pricing } from "@/components/home/pricing";
+import { Faq, FAQ_ITEMS } from "@/components/home/faq";
+import { Footer, FinalCta } from "@/components/home/footer";
+import { createMetadata, faqJsonLd } from "@/lib/metadata";
 
 export const metadata = createMetadata({
-  title: "Smart Meet — AI-Powered Meeting Intelligence",
+  title: "Meetup — AI Meeting Workspace: Live Transcription & Summaries",
   description:
-    "Real-time transcription, AI summaries, action items, and team collaboration — all in one workspace. Start your first meeting free, no credit card needed.",
+    "Meetup is the AI meeting workspace: live video rooms, real-time Hindi, Marathi & English transcription, instant summaries and action items. Start free.",
   path: "/",
+  absoluteTitle: true,
   keywords: [
     "free meeting transcription",
-    "AI meeting notes",
+    "AI meeting notes India",
     "meeting recorder online",
     "meeting summary generator",
   ],
 });
 
-export default async function HomePage() {
-  const { userId } = await auth();
-
-  if (userId) {
-    redirect("/dashboard");
-  }
-
+// Signed-in visitors are redirected to /dashboard by proxy.ts, so this page is fully static.
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col font-sans selection:bg-primary/20 landing-page">
+    <div className="relative flex min-h-screen flex-col overflow-x-clip">
+      <a
+        href="#main"
+        className="sr-only z-[60] rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Skip to content
+      </a>
       <Navbar />
-      <main className="flex-1 flex flex-col items-center pt-32 pb-0">
+      <main id="main" className="flex-1">
         <Hero />
         <Features />
+        <HowItWorks />
+        <Languages />
+        <Pricing />
+        <Faq />
+        <FinalCta />
       </main>
       <Footer />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ_ITEMS)) }}
+      />
     </div>
   );
 }

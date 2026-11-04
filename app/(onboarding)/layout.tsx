@@ -1,35 +1,23 @@
-import React from 'react';
-import { Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Providers } from "@/components/providers";
+import { Logo } from "@/components/brand/logo";
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background/90 p-6 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="text-lg font-bold tracking-tight text-foreground">MeetMind AI</span>
+    <Providers>
+      <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="bg-dot-grid absolute inset-0 opacity-40" />
+          <div className="absolute -top-40 left-1/2 h-[26rem] w-[44rem] -translate-x-1/2 rounded-full bg-primary/20 blur-[120px]" />
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="hidden items-center gap-2 border border-border bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground sm:flex">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            <span>SOC2 Compliant</span>
-          </div>
-          <Link href="#" className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-            <HelpCircle className="h-3.5 w-3.5" />
-            Need help?
-          </Link>
-        </div>
-      </header>
+        <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
+          <Logo />
+        </header>
 
-      <main className="flex-1 flex flex-col items-center justify-start p-6 sm:p-12 mb-20">
-        <div className="w-full max-w-3xl">
-          {children}
-        </div>
-      </main>
-    </div>
+        <main className="relative z-10 flex flex-1 flex-col items-center justify-start p-6 pb-20 sm:p-12">
+          <div className="w-full max-w-3xl">{children}</div>
+        </main>
+      </div>
+    </Providers>
   );
 }

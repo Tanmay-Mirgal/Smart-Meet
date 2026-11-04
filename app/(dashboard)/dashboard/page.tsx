@@ -3,7 +3,7 @@ import { createMetadata } from "@/lib/metadata";
 
 export const metadata = createMetadata({
   title: "Dashboard",
-  description: "Monitor live meetings, summaries, and action items in your Smart Meet workspace.",
+  description: "Monitor live meetings, summaries, and action items in your Meetup workspace.",
   path: "/dashboard",
   index: false,
 });

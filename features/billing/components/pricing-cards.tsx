@@ -5,27 +5,8 @@ import { CheckCircle2, Sparkles, Zap, Lock, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-
-// ── Plan definitions ─────────────────────────────────────────────────────────
-
-const FREE_FEATURES = [
-  "Up to 10 meetings",
-  "Live meeting rooms",
-  "Team invitations & chat",
-  "Real-time whiteboard",
-  "Basic dashboard",
-];
-
-const PRO_FEATURES = [
-  "Unlimited meetings",
-  "AI-powered summaries",
-  "Action item tracking",
-  "Minutes of meetings (PDF)",
-  "Notion export",
-  "Browser recordings",
-  "Google Calendar sync",
-  "Priority support",
-];
+import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
+import { BRAND_COLORS, SITE_NAME } from "@/lib/site";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,11 +103,11 @@ export function PricingCards({
         key: orderData.keyId!,
         amount: orderData.amount!,
         currency: orderData.currency ?? "INR",
-        name: "Smart Meet",
+        name: SITE_NAME,
         description: "Pro Plan — Unlimited meetings & AI features",
         order_id: orderData.orderId,
         prefill: { name: userName, email: userEmail },
-        theme: { color: "#6d28d9" },
+        theme: { color: BRAND_COLORS.primary },
         modal: {
           ondismiss: () => {
             setIsLoading(false);
@@ -225,24 +206,24 @@ export function PricingCards({
         <div className="relative mb-5">
           <div className="flex items-center gap-2 mb-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Crown className="h-4 w-4 text-primary" />
+              <Crown className="h-4 w-4 text-brand" />
             </div>
             <span className="text-sm font-semibold text-foreground">Pro</span>
             {isPro && (
-              <Badge className="ml-auto text-xs bg-primary/10 text-primary border border-primary/20">
+              <Badge className="ml-auto text-xs bg-primary/10 text-brand border border-primary/20">
                 Current plan ✓
               </Badge>
             )}
           </div>
 
           <div className="mb-1 flex items-end gap-2">
-            <span className="text-4xl font-black text-foreground">$10</span>
+            <span className="text-4xl font-black text-foreground">${PRO_PRICE.usd}</span>
             <div className="mb-1 text-sm text-muted-foreground leading-tight">
               <div>/ month</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-primary">₹849</span>
+            <span className="text-lg font-bold text-brand">₹{PRO_PRICE.inr}</span>
             <span className="text-xs text-muted-foreground">/ month (INR)</span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Everything in Free, plus</p>
@@ -251,14 +232,14 @@ export function PricingCards({
         <ul className="relative mb-6 flex-1 space-y-2.5">
           {PRO_FEATURES.map((f) => (
             <li key={f} className="flex items-center gap-2 text-sm text-foreground/90">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
               {f}
             </li>
           ))}
         </ul>
 
         {isPro ? (
-          <div className="relative flex items-center justify-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 text-sm font-semibold text-primary">
+          <div className="relative flex items-center justify-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 text-sm font-semibold text-brand">
             <CheckCircle2 className="h-4 w-4" />
             You&apos;re on Pro — all features unlocked!
           </div>
@@ -286,7 +267,7 @@ export function PricingCards({
               ) : (
                 <>
                   <Lock className="h-4 w-4" />
-                  Upgrade to Pro — ₹849/mo
+                  Upgrade to Pro — ₹{PRO_PRICE.inr}/mo
                 </>
               )}
             </Button>

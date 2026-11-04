@@ -3,7 +3,7 @@ import { createMetadata } from "@/lib/metadata";
 
 export const metadata = createMetadata({
   title: "Billing",
-  description: "Manage your Smart Meet workspace billing, plan limits, and premium collaboration features.",
+  description: "Manage your Meetup workspace billing, plan limits, and premium collaboration features.",
   path: "/billing",
   index: false,
 });
