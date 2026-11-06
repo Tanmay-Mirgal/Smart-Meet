@@ -1,4 +1,4 @@
-import { RESOURCES, type ResourceName } from "./registry";
+import { getAction, RESOURCES, type ResourceName } from "./registry";
 
 /**
  * Pure route table for `/connect/v1/*` (path relative to that prefix).
@@ -118,6 +118,32 @@ export function matchRoute(method: string, path: string): Route | null {
 /** True when the path exists for a *different* method (→ 405 rather than 404). */
 export function pathExistsForOtherMethod(method: string, path: string): boolean {
   return ENTRIES.some((entry) => entry.method !== method && entry.regex.test(path));
+}
+
+/**
+ * Scope(s) a bearer token must hold for a route (CP1 §4). Operations are
+ * checked against the scope of the action that created them, inside the
+ * exec function, so they need none here.
+ */
+export function requiredScopesFor(route: Route): string[] {
+  switch (route.kind) {
+    case "resource":
+      return [...(RESOURCES.find((r) => r.name === route.name)?.scopes ?? [])];
+    case "action":
+      return [...(getAction(route.params.name)?.scopes ?? [])];
+    case "webhooks.create":
+    case "webhooks.list":
+    case "webhooks.get":
+    case "webhooks.update":
+    case "webhooks.delete":
+    case "webhooks.deliveries":
+    case "webhooks.redeliver":
+      return ["meetup:webhooks:manage"];
+    case "events":
+      return ["meetup:events:read"];
+    default:
+      return [];
+  }
 }
 
 /** Routes served without a bearer token. */

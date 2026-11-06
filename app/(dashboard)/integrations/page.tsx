@@ -9,5 +9,6 @@ export const metadata = createMetadata({
 });
 
 export default function IntegrationsRoute() {
-  return <IntegrationsPage />;
+  // The "Connected apps" section only exists when the ecosystem connector is on.
+  return <IntegrationsPage connectorEnabled={process.env.CONNECTOR_ENABLED === "true"} />;
 }

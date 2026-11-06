@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingBlock } from "@/components/shared/loading-block";
 import { integrationsService } from "@/features/integrations/services/integrations-service";
+import { ConnectedApps } from "@/features/connector/components/connected-apps";
 import { cn } from "@/lib/utils";
 import { PageHeader, HeaderStat } from "@/components/shared/page-header";
 
@@ -77,7 +78,7 @@ function FeatureItem({ icon: Icon, text }: { icon: React.ElementType; text: stri
 
 /* ─── main page ─────────────────────────────────────────── */
 
-export function IntegrationsPage() {
+export function IntegrationsPage({ connectorEnabled = false }: { connectorEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { organization } = useOrganization();
@@ -517,6 +518,9 @@ export function IntegrationsPage() {
         </div>
 
       </div>
+
+      {/* Ecosystem connector — renders nothing unless CONNECTOR_ENABLED=true */}
+      {connectorEnabled && <ConnectedApps orgId={organization.id} orgName={organization.name} />}
     </div>
   );
 }

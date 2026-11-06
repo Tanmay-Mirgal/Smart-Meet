@@ -9,6 +9,14 @@
  */
 
 import type * as billing_index from "../billing/index.js";
+import type * as connector_authorize from "../connector/authorize.js";
+import type * as connector_consent from "../connector/consent.js";
+import type * as connector_exec from "../connector/exec.js";
+import type * as connector_gate from "../connector/gate.js";
+import type * as connector_grantAccess from "../connector/grantAccess.js";
+import type * as connector_grants from "../connector/grants.js";
+import type * as connector_oauth from "../connector/oauth.js";
+import type * as connector_subject from "../connector/subject.js";
 import type * as connector_audit from "../connector/audit.js";
 import type * as connector_config from "../connector/config.js";
 import type * as connector_crypto from "../connector/crypto.js";
@@ -58,6 +66,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "billing/index": typeof billing_index;
+  "connector/authorize": typeof connector_authorize;
+  "connector/consent": typeof connector_consent;
+  "connector/exec": typeof connector_exec;
+  "connector/gate": typeof connector_gate;
+  "connector/grantAccess": typeof connector_grantAccess;
+  "connector/grants": typeof connector_grants;
+  "connector/oauth": typeof connector_oauth;
+  "connector/subject": typeof connector_subject;
   "connector/audit": typeof connector_audit;
   "connector/config": typeof connector_config;
   "connector/crypto": typeof connector_crypto;
