@@ -1,8 +1,13 @@
 import { mutation, query } from "../_generated/server";
-import { v } from "convex/values";
+import { v, type ObjectType } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
-import { api, internal } from "../_generated/api";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { actorFromIdentity, type Actor } from "../lib/actor";
+import { getOrganizationPlanCore } from "../billing/index";
+import { getGoogleCalendarConnectionCore } from "../integrations/index";
+import { InputError, PlanLimitError, PreconditionError } from "../lib/errors";
+import type { ExternalRef } from "../lib/connectorFields";
 import {
   assertMeetingAccess,
   assertMeetingHost,
@@ -27,6 +32,7 @@ import {
   meetingSettingsValidator,
   resolveJoinDecision,
   resolveParticipantPermissions,
+  type MeetingSettings,
 } from "../lib/meetingPermissions";
 import {
   normalizeInviteEmailList,
@@ -239,254 +245,296 @@ async function requireWhiteboardEditorAccess(
   return { meeting, participant };
 }
 
-export const create = mutation({
-  args: {
-    orgId: v.string(),
-    title: v.string(),
-    purpose: v.optional(v.string()),
-    description: v.optional(v.string()),
-    scheduledFor: v.optional(v.number()),
-    scheduledEndsAt: v.optional(v.number()),
-    scheduledTimeZone: v.optional(v.string()),
-    syncWithGoogleCalendar: v.optional(v.boolean()),
-    settings: v.optional(meetingSettingsValidator),
-    inviteEmails: v.optional(v.array(v.string())),
-  },
-  handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-    const billing: {
-      maxMeetings: number | null;
-      features: {
-        googleCalendarSync: boolean;
-      };
-      usage: {
-        meetingsLimitReached: boolean;
-      };
-    } = await ctx.runQuery(api.billing.index.getOrganizationPlan, {
+const createMeetingArgs = {
+  orgId: v.string(),
+  title: v.string(),
+  purpose: v.optional(v.string()),
+  description: v.optional(v.string()),
+  scheduledFor: v.optional(v.number()),
+  scheduledEndsAt: v.optional(v.number()),
+  scheduledTimeZone: v.optional(v.string()),
+  syncWithGoogleCalendar: v.optional(v.boolean()),
+  settings: v.optional(meetingSettingsValidator),
+  inviteEmails: v.optional(v.array(v.string())),
+};
+
+/**
+ * Everything the browser sends, plus the optional correlation fields the
+ * ecosystem connector sets. `settings` is partial because defaults are merged
+ * in below; the browser always sends a complete object.
+ */
+export type CreateMeetingInput = Omit<
+  ObjectType<typeof createMeetingArgs>,
+  "settings"
+> & {
+  settings?: Partial<MeetingSettings>;
+  createdVia?: "connector";
+  externalRef?: ExternalRef;
+  metadataJson?: string;
+};
+
+export async function createMeetingCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: CreateMeetingInput,
+): Promise<Id<"meetings">> {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
+  const billing = await getOrganizationPlanCore(ctx, actor, args.orgId);
+  const now = Date.now();
+  const isScheduled =
+    typeof args.scheduledFor === "number" && args.scheduledFor > now;
+  const settings = getDefaultMeetingSettings(args.settings);
+  const shouldSyncWithGoogleCalendar =
+    isScheduled && args.syncWithGoogleCalendar === true;
+
+  if (
+    typeof args.scheduledFor === "number" &&
+    typeof args.scheduledEndsAt === "number" &&
+    args.scheduledEndsAt <= args.scheduledFor
+  ) {
+    throw new InputError(
+      "Meeting end time must be after the start time",
+      "scheduledEndsAt",
+    );
+  }
+
+  if (args.syncWithGoogleCalendar && !isScheduled) {
+    throw new InputError(
+      "Google Calendar sync is only available for scheduled meetings",
+      "syncWithGoogleCalendar",
+    );
+  }
+
+  if (billing.usage.meetingsLimitReached) {
+    throw new PlanLimitError(
+      billing.maxMeetings === null
+        ? "This workspace cannot create more meetings right now."
+        : `This workspace has reached its ${billing.maxMeetings}-meeting limit. Upgrade the plan to create more meetings.`,
+      { limit: billing.maxMeetings, feature: "maxMeetings" },
+    );
+  }
+
+  if (shouldSyncWithGoogleCalendar && !billing.features.googleCalendarSync) {
+    throw new PlanLimitError(
+      "Google Calendar sync is only available on paid workspace plans",
+      { feature: "googleCalendarSync" },
+    );
+  }
+
+  if (shouldSyncWithGoogleCalendar) {
+    const googleCalendarConnection = await getGoogleCalendarConnectionCore(
+      ctx,
+      actor,
+      args.orgId,
+    );
+
+    if (!googleCalendarConnection?.connected) {
+      throw new PreconditionError(
+        "Connect Google Calendar before enabling calendar sync",
+        "/integrations",
+      );
+    }
+  }
+
+  const meetingId = await ctx.db.insert("meetings", {
+    orgId: args.orgId,
+    title: args.title,
+    purpose: args.purpose ?? args.description ?? args.title,
+    description: args.description,
+    creatorTokenIdentifier: actor.tokenIdentifier,
+    creatorClerkId: actor.clerkId,
+    creatorName: actor.displayName,
+    hostUserTokenIdentifier: actor.tokenIdentifier,
+    hostClerkId: actor.clerkId,
+    status: isScheduled ? "scheduled" : "active",
+    isLocked: false,
+    settings,
+    scheduledFor: args.scheduledFor,
+    scheduledEndsAt: args.scheduledEndsAt,
+    scheduledTimeZone: args.scheduledTimeZone,
+    startedAt: isScheduled ? undefined : now,
+    googleCalendarSyncRequested: shouldSyncWithGoogleCalendar || undefined,
+    googleCalendarSyncStatus: shouldSyncWithGoogleCalendar ? "pending" : undefined,
+    googleCalendarEventId: undefined,
+    googleCalendarEventUrl: undefined,
+    googleCalendarLastSyncedAt: undefined,
+    googleCalendarSyncError: undefined,
+    lastActivityAt: now,
+    createdVia: args.createdVia,
+    externalRef: args.externalRef,
+    metadataJson: args.metadataJson,
+  });
+
+  await ctx.db.insert("meeting_participants", {
+    meetingId,
+    userTokenIdentifier: actor.tokenIdentifier,
+    clerkId: actor.clerkId,
+    name: actor.displayName,
+    imageUrl: actor.imageUrl,
+    role: "host",
+    permissionsOverride: undefined,
+    status: "left",
+    createdAt: now,
+    requestedAt: now,
+    joinedAt: now,
+    admittedAt: undefined,
+    leftAt: now,
+    removedAt: undefined,
+    rejectedAt: undefined,
+    removedByParticipantId: undefined,
+    rejoinBlocked: false,
+    lastSeenAt: now,
+    isMutedByModerator: false,
+    isMicEnabled: false,
+    isCameraEnabled: false,
+    isScreenSharing: false,
+  });
+
+  const inviteEmails = normalizeInviteEmailList(args.inviteEmails ?? []);
+
+  for (const email of inviteEmails) {
+    const inviteToken = createInviteAccessToken();
+    const inviteId = await ctx.db.insert("meeting_invites", {
+      meetingId,
       orgId: args.orgId,
+      email,
+      invitedUserTokenIdentifier: undefined,
+      role: "participant",
+      invitedByTokenIdentifier: actor.tokenIdentifier,
+      invitedByName: actor.displayName,
+      token: inviteToken,
+      status: "pending",
+      expiresAt: now + INVITE_TTL_MS,
+      lastSentAt: now,
+      acceptedAt: undefined,
+      declinedAt: undefined,
+      cancelledAt: undefined,
+      respondedAt: undefined,
+      lastNotificationAt: undefined,
+      emailDeliveryStatus: "pending",
+      lastEmailAttemptAt: undefined,
+      lastEmailError: undefined,
+      createdAt: now,
     });
-    const now = Date.now();
-    const isScheduled =
-      typeof args.scheduledFor === "number" && args.scheduledFor > now;
-    const settings = getDefaultMeetingSettings(args.settings);
-    const shouldSyncWithGoogleCalendar =
-      isScheduled && args.syncWithGoogleCalendar === true;
 
-    if (
-      typeof args.scheduledFor === "number" &&
-      typeof args.scheduledEndsAt === "number" &&
-      args.scheduledEndsAt <= args.scheduledFor
-    ) {
-      throw new Error("Meeting end time must be after the start time");
-    }
-
-    if (args.syncWithGoogleCalendar && !isScheduled) {
-      throw new Error("Google Calendar sync is only available for scheduled meetings");
-    }
-
-    if (billing.usage.meetingsLimitReached) {
-      throw new Error(
-        billing.maxMeetings === null
-          ? "This workspace cannot create more meetings right now."
-          : `This workspace has reached its ${billing.maxMeetings}-meeting limit. Upgrade the plan to create more meetings.`,
-      );
-    }
-
-    if (shouldSyncWithGoogleCalendar && !billing.features.googleCalendarSync) {
-      throw new Error("Google Calendar sync is only available on paid workspace plans");
-    }
-
-    if (shouldSyncWithGoogleCalendar) {
-      const googleCalendarConnection = await ctx.runQuery(
-        api.integrations.index.getGoogleCalendarConnection,
-        { orgId: args.orgId },
-      );
-
-      if (!googleCalendarConnection?.connected) {
-        throw new Error("Connect Google Calendar before enabling calendar sync");
-      }
-    }
-
-    const meetingId = await ctx.db.insert("meetings", {
+    await deliverInvite(ctx, {
+      inviteId,
+      meetingId,
       orgId: args.orgId,
-      title: args.title,
-      purpose: args.purpose ?? args.description ?? args.title,
-      description: args.description,
-      creatorTokenIdentifier: identity.tokenIdentifier,
-      creatorClerkId: identity.subject,
-      creatorName: getIdentityName(identity),
-      hostUserTokenIdentifier: identity.tokenIdentifier,
-      hostClerkId: identity.subject,
-      status: isScheduled ? "scheduled" : "active",
-      isLocked: false,
-      settings,
+      meetingTitle: args.title,
+      inviterName: actor.displayName,
+      email,
       scheduledFor: args.scheduledFor,
       scheduledEndsAt: args.scheduledEndsAt,
       scheduledTimeZone: args.scheduledTimeZone,
-      startedAt: isScheduled ? undefined : now,
-      googleCalendarSyncRequested: shouldSyncWithGoogleCalendar || undefined,
-      googleCalendarSyncStatus: shouldSyncWithGoogleCalendar ? "pending" : undefined,
-      googleCalendarEventId: undefined,
-      googleCalendarEventUrl: undefined,
-      googleCalendarLastSyncedAt: undefined,
-      googleCalendarSyncError: undefined,
-      lastActivityAt: now,
+      inviteToken,
     });
+  }
 
-    await ctx.db.insert("meeting_participants", {
-      meetingId,
-      userTokenIdentifier: identity.tokenIdentifier,
-      clerkId: identity.subject,
-      name: getIdentityName(identity),
-      imageUrl: identity.pictureUrl,
-      role: "host",
-      permissionsOverride: undefined,
-      status: "left",
+  const memberships = await ctx.db
+    .query("user_org_memberships")
+    .withIndex("by_orgId", (q) => q.eq("orgId", args.orgId))
+    .collect();
+
+  for (const membership of memberships) {
+    await ctx.db.insert("notifications", {
+      userTokenIdentifier: membership.userTokenIdentifier,
+      orgId: args.orgId,
+      message: isScheduled
+        ? `New meeting scheduled: ${args.title}`
+        : `${actor.displayName} started ${args.title}`,
+      link: `/meeting/${meetingId}`,
+      isRead: false,
       createdAt: now,
-      requestedAt: now,
-      joinedAt: now,
-      admittedAt: undefined,
-      leftAt: now,
-      removedAt: undefined,
-      rejectedAt: undefined,
-      removedByParticipantId: undefined,
-      rejoinBlocked: false,
-      lastSeenAt: now,
-      isMutedByModerator: false,
-      isMicEnabled: false,
-      isCameraEnabled: false,
-      isScreenSharing: false,
     });
+  }
 
-    const inviteEmails = normalizeInviteEmailList(args.inviteEmails ?? []);
+  if (shouldSyncWithGoogleCalendar) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.integrations.index.syncMeetingToGoogleCalendar,
+      { meetingId },
+    );
+  }
 
-    for (const email of inviteEmails) {
-      const inviteToken = createInviteAccessToken();
-      const inviteId = await ctx.db.insert("meeting_invites", {
-        meetingId,
-        orgId: args.orgId,
-        email,
-        invitedUserTokenIdentifier: undefined,
-        role: "participant",
-        invitedByTokenIdentifier: identity.tokenIdentifier,
-        invitedByName: getIdentityName(identity),
-        token: inviteToken,
-        status: "pending",
-        expiresAt: now + INVITE_TTL_MS,
-        lastSentAt: now,
-        acceptedAt: undefined,
-        declinedAt: undefined,
-        cancelledAt: undefined,
-        respondedAt: undefined,
-        lastNotificationAt: undefined,
-        emailDeliveryStatus: "pending",
-        lastEmailAttemptAt: undefined,
-        lastEmailError: undefined,
-        createdAt: now,
-      });
+  return meetingId;
+}
 
-      await deliverInvite(ctx, {
-        inviteId,
-        meetingId,
-        orgId: args.orgId,
-        meetingTitle: args.title,
-        inviterName: getIdentityName(identity),
-        email,
-        scheduledFor: args.scheduledFor,
-        scheduledEndsAt: args.scheduledEndsAt,
-        scheduledTimeZone: args.scheduledTimeZone,
-        inviteToken,
-      });
-    }
-
-    const memberships = await ctx.db
-      .query("user_org_memberships")
-      .withIndex("by_orgId", (q) => q.eq("orgId", args.orgId))
-      .collect();
-
-    for (const membership of memberships) {
-      await ctx.db.insert("notifications", {
-        userTokenIdentifier: membership.userTokenIdentifier,
-        orgId: args.orgId,
-        message: isScheduled
-          ? `New meeting scheduled: ${args.title}`
-          : `${getIdentityName(identity)} started ${args.title}`,
-        link: `/meeting/${meetingId}`,
-        isRead: false,
-        createdAt: now,
-      });
-    }
-
-    if (shouldSyncWithGoogleCalendar) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.integrations.index.syncMeetingToGoogleCalendar,
-        { meetingId },
-      );
-    }
-
-    return meetingId;
+export const create = mutation({
+  args: createMeetingArgs,
+  handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx);
+    return await createMeetingCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
+const getMeetingArgs = { meetingId: v.id("meetings") };
+
+export async function getMeetingCore(
+  ctx: QueryCtx,
+  actor: Actor,
+  args: ObjectType<typeof getMeetingArgs>,
+) {
+  const meeting = await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  const participant = await getMeetingParticipant(
+    ctx,
+    args.meetingId,
+    actor.tokenIdentifier,
+  );
+  const isOrgMember = await hasOrgAccess(
+    ctx,
+    actor.tokenIdentifier,
+    meeting.orgId,
+  );
+  const isInvited = await hasMeetingInvite(
+    ctx,
+    args.meetingId,
+    actor.email,
+    actor.tokenIdentifier,
+  );
+  const participants = await listActiveParticipants(ctx, args.meetingId);
+  const waitingRoom = hasMeetingPermission(meeting, participant, "canAdmitOthers")
+    ? await listMeetingParticipantsByStatus(ctx, args.meetingId, "waiting")
+    : [];
+  const latestSummary = await ctx.db
+    .query("meeting_assets")
+    .withIndex("by_meetingId_and_type", (q) =>
+      q.eq("meetingId", args.meetingId).eq("type", "summary"),
+    )
+    .unique();
+  const effectivePermissions = participant
+    ? resolveParticipantPermissions(meeting, participant)
+    : createEmptyMeetingPermissionMap();
+  const joinDecision = resolveJoinDecision({
+    meeting,
+    participant,
+    isOrgMember,
+    isInvited,
+  });
+
+  return {
+    ...meeting,
+    settings: getDefaultMeetingSettings(meeting.settings),
+    durationMs: getMeetingDuration(meeting),
+    activeParticipants: participants.length,
+    waitingParticipants: waitingRoom.length,
+    summary: latestSummary?.content ?? null,
+    key_points: latestSummary?.key_points ?? [],
+    decisions: latestSummary?.decisions ?? [],
+    action_items: latestSummary?.action_items ?? [],
+    currentParticipant: participant,
+    effectivePermissions,
+    joinDecision,
+    isOrgMember,
+    isInvited,
+  };
+}
+
 export const get = query({
-  args: { meetingId: v.id("meetings") },
+  args: getMeetingArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const meeting = await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    const participant = await getMeetingParticipant(
-      ctx,
-      args.meetingId,
-      identity.tokenIdentifier,
-    );
-    const isOrgMember = await hasOrgAccess(
-      ctx,
-      identity.tokenIdentifier,
-      meeting.orgId,
-    );
-    const isInvited = await hasMeetingInvite(
-      ctx,
-      args.meetingId,
-      identity.email ?? null,
-      identity.tokenIdentifier,
-    );
-    const participants = await listActiveParticipants(ctx, args.meetingId);
-    const waitingRoom = hasMeetingPermission(meeting, participant, "canAdmitOthers")
-      ? await listMeetingParticipantsByStatus(ctx, args.meetingId, "waiting")
-      : [];
-    const latestSummary = await ctx.db
-      .query("meeting_assets")
-      .withIndex("by_meetingId_and_type", (q) =>
-        q.eq("meetingId", args.meetingId).eq("type", "summary"),
-      )
-      .unique();
-    const effectivePermissions = participant
-      ? resolveParticipantPermissions(meeting, participant)
-      : createEmptyMeetingPermissionMap();
-    const joinDecision = resolveJoinDecision({
-      meeting,
-      participant,
-      isOrgMember,
-      isInvited,
-    });
-
-    return {
-      ...meeting,
-      settings: getDefaultMeetingSettings(meeting.settings),
-      durationMs: getMeetingDuration(meeting),
-      activeParticipants: participants.length,
-      waitingParticipants: waitingRoom.length,
-      summary: latestSummary?.content ?? null,
-      key_points: latestSummary?.key_points ?? [],
-      decisions: latestSummary?.decisions ?? [],
-      action_items: latestSummary?.action_items ?? [],
-      currentParticipant: participant,
-      effectivePermissions,
-      joinDecision,
-      isOrgMember,
-      isInvited,
-    };
+    return await getMeetingCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
@@ -560,92 +608,56 @@ export const updateLock = mutation({
   },
 });
 
-export const inviteParticipants = mutation({
-  args: {
-    meetingId: v.id("meetings"),
-    emails: v.array(v.string()),
-    role: v.optional(meetingRoleValidator),
-  },
-  handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx);
-    const meeting = await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    const participant = await getMeetingParticipant(
-      ctx,
-      args.meetingId,
-      identity.tokenIdentifier,
-    );
+const inviteParticipantsArgs = {
+  meetingId: v.id("meetings"),
+  emails: v.array(v.string()),
+  role: v.optional(meetingRoleValidator),
+};
 
-    if (!hasMeetingPermission(meeting, participant, "canChangeSettings")) {
-      throw new Error("You do not have permission to invite people");
-    }
+export async function inviteParticipantsCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof inviteParticipantsArgs>,
+) {
+  const meeting = await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  const participant = await getMeetingParticipant(
+    ctx,
+    args.meetingId,
+    actor.tokenIdentifier,
+  );
 
-    const role = args.role ?? "participant";
-    const now = Date.now();
-    const inserted: string[] = [];
-    for (const email of normalizeInviteEmailList(args.emails)) {
-      const existing = await ctx.db
-        .query("meeting_invites")
-        .withIndex("by_meetingId_and_email", (q) =>
-          q.eq("meetingId", args.meetingId).eq("email", email),
-        )
-        .unique();
+  if (!hasMeetingPermission(meeting, participant, "canChangeSettings")) {
+    throw new Error("You do not have permission to invite people");
+  }
 
-      if (existing) {
-        const resolvedStatus = resolveInviteStatus(existing);
-        if (resolvedStatus === "accepted" || resolvedStatus === "pending") {
-          continue;
-        }
+  const role = args.role ?? "participant";
+  const now = Date.now();
+  const inserted: string[] = [];
+  for (const email of normalizeInviteEmailList(args.emails)) {
+    const existing = await ctx.db
+      .query("meeting_invites")
+      .withIndex("by_meetingId_and_email", (q) =>
+        q.eq("meetingId", args.meetingId).eq("email", email),
+      )
+      .unique();
 
-        const inviteToken = existing.token ?? createInviteAccessToken();
-
-        await ctx.db.patch(existing._id, {
-          role,
-          invitedUserTokenIdentifier: existing.invitedUserTokenIdentifier,
-          invitedByTokenIdentifier: identity.tokenIdentifier,
-          invitedByName: getIdentityName(identity),
-          token: inviteToken,
-          status: "pending",
-          expiresAt: now + INVITE_TTL_MS,
-          lastSentAt: now,
-          declinedAt: undefined,
-          cancelledAt: undefined,
-          respondedAt: undefined,
-          lastNotificationAt: undefined,
-          emailDeliveryStatus: "pending",
-          lastEmailAttemptAt: undefined,
-          lastEmailError: undefined,
-        });
-
-        await deliverInvite(ctx, {
-          inviteId: existing._id,
-          meetingId: args.meetingId,
-          orgId: meeting.orgId,
-          meetingTitle: meeting.title,
-          inviterName: participant?.name ?? getIdentityName(identity),
-          email,
-          scheduledFor: meeting.scheduledFor,
-          scheduledEndsAt: meeting.scheduledEndsAt,
-          scheduledTimeZone: meeting.scheduledTimeZone,
-          inviteToken,
-        });
-        inserted.push(email);
+    if (existing) {
+      const resolvedStatus = resolveInviteStatus(existing);
+      if (resolvedStatus === "accepted" || resolvedStatus === "pending") {
         continue;
       }
 
-      const inviteToken = createInviteAccessToken();
-      const inviteId = await ctx.db.insert("meeting_invites", {
-        meetingId: args.meetingId,
-        orgId: meeting.orgId,
-        email,
-        invitedUserTokenIdentifier: undefined,
+      const inviteToken = existing.token ?? createInviteAccessToken();
+
+      await ctx.db.patch(existing._id, {
         role,
-        invitedByTokenIdentifier: identity.tokenIdentifier,
-        invitedByName: participant?.name ?? getIdentityName(identity),
+        invitedUserTokenIdentifier: existing.invitedUserTokenIdentifier,
+        invitedByTokenIdentifier: actor.tokenIdentifier,
+        invitedByName: actor.displayName,
         token: inviteToken,
         status: "pending",
         expiresAt: now + INVITE_TTL_MS,
         lastSentAt: now,
-        acceptedAt: undefined,
         declinedAt: undefined,
         cancelledAt: undefined,
         respondedAt: undefined,
@@ -653,14 +665,14 @@ export const inviteParticipants = mutation({
         emailDeliveryStatus: "pending",
         lastEmailAttemptAt: undefined,
         lastEmailError: undefined,
-        createdAt: now,
       });
+
       await deliverInvite(ctx, {
-        inviteId,
+        inviteId: existing._id,
         meetingId: args.meetingId,
         orgId: meeting.orgId,
         meetingTitle: meeting.title,
-        inviterName: participant?.name ?? getIdentityName(identity),
+        inviterName: participant?.name ?? actor.displayName,
         email,
         scheduledFor: meeting.scheduledFor,
         scheduledEndsAt: meeting.scheduledEndsAt,
@@ -668,17 +680,63 @@ export const inviteParticipants = mutation({
         inviteToken,
       });
       inserted.push(email);
+      continue;
     }
 
-    await insertAuditLog(ctx, {
+    const inviteToken = createInviteAccessToken();
+    const inviteId = await ctx.db.insert("meeting_invites", {
       meetingId: args.meetingId,
-      actorParticipantId: participant?._id,
-      actorName: participant?.name ?? getIdentityName(identity),
-      action: "participants_invited",
-      metadata: JSON.stringify({ count: inserted.length, role }),
+      orgId: meeting.orgId,
+      email,
+      invitedUserTokenIdentifier: undefined,
+      role,
+      invitedByTokenIdentifier: actor.tokenIdentifier,
+      invitedByName: participant?.name ?? actor.displayName,
+      token: inviteToken,
+      status: "pending",
+      expiresAt: now + INVITE_TTL_MS,
+      lastSentAt: now,
+      acceptedAt: undefined,
+      declinedAt: undefined,
+      cancelledAt: undefined,
+      respondedAt: undefined,
+      lastNotificationAt: undefined,
+      emailDeliveryStatus: "pending",
+      lastEmailAttemptAt: undefined,
+      lastEmailError: undefined,
+      createdAt: now,
     });
+    await deliverInvite(ctx, {
+      inviteId,
+      meetingId: args.meetingId,
+      orgId: meeting.orgId,
+      meetingTitle: meeting.title,
+      inviterName: participant?.name ?? actor.displayName,
+      email,
+      scheduledFor: meeting.scheduledFor,
+      scheduledEndsAt: meeting.scheduledEndsAt,
+      scheduledTimeZone: meeting.scheduledTimeZone,
+      inviteToken,
+    });
+    inserted.push(email);
+  }
 
-    return inserted;
+  await insertAuditLog(ctx, {
+    meetingId: args.meetingId,
+    actorParticipantId: participant?._id,
+    actorName: participant?.name ?? actor.displayName,
+    action: "participants_invited",
+    metadata: JSON.stringify({ count: inserted.length, role }),
+  });
+
+  return inserted;
+}
+
+export const inviteParticipants = mutation({
+  args: inviteParticipantsArgs,
+  handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx);
+    return await inviteParticipantsCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
@@ -831,49 +889,69 @@ export const cancelInvite = mutation({
   },
 });
 
+const endMeetingArgs = { meetingId: v.id("meetings") };
+
+export async function endMeetingCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof endMeetingArgs>,
+) {
+  const meeting = await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  const participant = await getMeetingParticipant(
+    ctx,
+    args.meetingId,
+    actor.tokenIdentifier,
+  );
+  assertMeetingHost(participant);
+  await ctx.db.patch(args.meetingId, {
+    status: "ended",
+    endedAt: Date.now(),
+    lastActivityAt: Date.now(),
+  });
+
+  // Auto-clear any notifications linked to this meeting for all org members.
+  await ctx.scheduler.runAfter(0, internal.notifications.index.markReadByMeetingId, {
+    meetingId: args.meetingId,
+    orgId: meeting.orgId,
+  });
+
+  await insertAuditLog(ctx, {
+    meetingId: args.meetingId,
+    actorParticipantId: participant?._id,
+    actorName: participant?.name ?? actor.displayName,
+    action: "meeting_ended",
+  });
+}
+
 export const endMeeting = mutation({
-  args: { meetingId: v.id("meetings") },
+  args: endMeetingArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const meeting = await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    const participant = await getMeetingParticipant(
-      ctx,
-      args.meetingId,
-      identity.tokenIdentifier,
-    );
-    assertMeetingHost(participant);
-    await ctx.db.patch(args.meetingId, {
-      status: "ended",
-      endedAt: Date.now(),
-      lastActivityAt: Date.now(),
-    });
-
-    // Auto-clear any notifications linked to this meeting for all org members.
-    await ctx.scheduler.runAfter(0, internal.notifications.index.markReadByMeetingId, {
-      meetingId: args.meetingId,
-      orgId: meeting.orgId,
-    });
-
-    await insertAuditLog(ctx, {
-      meetingId: args.meetingId,
-      actorParticipantId: participant?._id,
-      actorName: participant?.name ?? getIdentityName(identity),
-      action: "meeting_ended",
-    });
+    return await endMeetingCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
+const getMeetingSummaryArgs = { meetingId: v.id("meetings") };
+
+export async function getMeetingSummaryCore(
+  ctx: QueryCtx,
+  actor: Actor,
+  args: ObjectType<typeof getMeetingSummaryArgs>,
+) {
+  await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  return await ctx.db
+    .query("meeting_assets")
+    .withIndex("by_meetingId_and_type", (q) =>
+      q.eq("meetingId", args.meetingId).eq("type", "summary"),
+    )
+    .unique();
+}
+
 export const getSummary = query({
-  args: { meetingId: v.id("meetings") },
+  args: getMeetingSummaryArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    return await ctx.db
-      .query("meeting_assets")
-      .withIndex("by_meetingId_and_type", (q) =>
-        q.eq("meetingId", args.meetingId).eq("type", "summary"),
-      )
-      .unique();
+    return await getMeetingSummaryCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
@@ -970,63 +1048,70 @@ export const saveWhiteboardScene = mutation({
   },
 });
 
-export const saveSummary = mutation({
-  args: {
-    meetingId: v.id("meetings"),
-    summary: v.string(),
-    key_points: v.optional(v.array(v.string())),
-    decisions: v.optional(v.array(v.string())),
-    action_items: v.optional(
-      v.array(
-        v.object({
-          task: v.string(),
-          assignee: v.union(v.string(), v.null()),
-          due: v.union(v.string(), v.null()),
-        }),
-      ),
+const saveSummaryArgs = {
+  meetingId: v.id("meetings"),
+  summary: v.string(),
+  key_points: v.optional(v.array(v.string())),
+  decisions: v.optional(v.array(v.string())),
+  action_items: v.optional(
+    v.array(
+      v.object({
+        task: v.string(),
+        assignee: v.union(v.string(), v.null()),
+        due: v.union(v.string(), v.null()),
+      }),
     ),
-  },
+  ),
+};
+
+export async function saveSummaryCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof saveSummaryArgs>,
+) {
+  const meeting = await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  const billing = await getOrganizationPlanCore(ctx, actor, meeting.orgId);
+
+  if (!billing.features.aiSummary) {
+    throw new PlanLimitError(
+      "AI summaries are only available on paid workspace plans",
+      { feature: "aiSummary" },
+    );
+  }
+
+  const existing = await ctx.db
+    .query("meeting_assets")
+    .withIndex("by_meetingId_and_type", (q) =>
+      q.eq("meetingId", args.meetingId).eq("type", "summary"),
+    )
+    .unique();
+
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      content: args.summary,
+      key_points: args.key_points,
+      decisions: args.decisions,
+      action_items: args.action_items,
+      updatedAt: Date.now(),
+    });
+  } else {
+    await ctx.db.insert("meeting_assets", {
+      meetingId: args.meetingId,
+      type: "summary",
+      content: args.summary,
+      key_points: args.key_points,
+      decisions: args.decisions,
+      action_items: args.action_items,
+      updatedAt: Date.now(),
+    });
+  }
+}
+
+export const saveSummary = mutation({
+  args: saveSummaryArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const meeting = await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    const billing: {
-      features: {
-        aiSummary: boolean;
-      };
-    } = await ctx.runQuery(api.billing.index.getOrganizationPlan, {
-      orgId: meeting.orgId,
-    });
-
-    if (!billing.features.aiSummary) {
-      throw new Error("AI summaries are only available on paid workspace plans");
-    }
-
-    const existing = await ctx.db
-      .query("meeting_assets")
-      .withIndex("by_meetingId_and_type", (q) =>
-        q.eq("meetingId", args.meetingId).eq("type", "summary"),
-      )
-      .unique();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        content: args.summary,
-        key_points: args.key_points,
-        decisions: args.decisions,
-        action_items: args.action_items,
-        updatedAt: Date.now(),
-      });
-    } else {
-      await ctx.db.insert("meeting_assets", {
-        meetingId: args.meetingId,
-        type: "summary",
-        content: args.summary,
-        key_points: args.key_points,
-        decisions: args.decisions,
-        action_items: args.action_items,
-        updatedAt: Date.now(),
-      });
-    }
+    return await saveSummaryCore(ctx, actorFromIdentity(identity), args);
   },
 });
 

@@ -1,8 +1,9 @@
 import { mutation, query } from "../_generated/server";
-import { v } from "convex/values";
+import { v, type ObjectType } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
+import { actorFromIdentity, type Actor } from "../lib/actor";
 import { assertMeetingAccess, requireIdentity } from "../lib/auth";
 import { getMeetingParticipant } from "../lib/meetinghelpers";
 import { hasMeetingPermission } from "../lib/meetingPermissions";
@@ -233,29 +234,39 @@ export const markFailed = mutation({
   },
 });
 
+const listRecordingsByMeetingArgs = {
+  meetingId: v.id("meetings"),
+};
+
+export async function listRecordingsByMeetingCore(
+  ctx: QueryCtx,
+  actor: Actor,
+  args: ObjectType<typeof listRecordingsByMeetingArgs>,
+) {
+  await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  const recordings = await ctx.db
+    .query("meeting_recordings")
+    .withIndex("by_meetingId_and_createdAt", (q) => q.eq("meetingId", args.meetingId))
+    .order("desc")
+    .take(100);
+
+  return await Promise.all(
+    recordings.map(async (recording) => {
+      const freshPlaybackUrl = recording.storageId
+        ? await ctx.storage.getUrl(recording.storageId)
+        : null;
+      return {
+        ...recording,
+        playbackUrl: freshPlaybackUrl ?? recording.playbackUrl,
+      };
+    }),
+  );
+}
+
 export const listByMeeting = query({
-  args: {
-    meetingId: v.id("meetings"),
-  },
+  args: listRecordingsByMeetingArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    const recordings = await ctx.db
-      .query("meeting_recordings")
-      .withIndex("by_meetingId_and_createdAt", (q) => q.eq("meetingId", args.meetingId))
-      .order("desc")
-      .take(100);
-
-    return await Promise.all(
-      recordings.map(async (recording) => {
-        const freshPlaybackUrl = recording.storageId
-          ? await ctx.storage.getUrl(recording.storageId)
-          : null;
-        return {
-          ...recording,
-          playbackUrl: freshPlaybackUrl ?? recording.playbackUrl,
-        };
-      }),
-    );
+    return await listRecordingsByMeetingCore(ctx, actorFromIdentity(identity), args);
   },
 });

@@ -1,12 +1,12 @@
 import { mutation, query } from "../_generated/server";
-import { v } from "convex/values";
+import { v, type ObjectType } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { actorFromIdentity, type Actor } from "../lib/actor";
 import {
   assertMeetingAccess,
   assertOrgAccess,
   getCurrentUserRecord,
-  getIdentityName,
   hasOrgAccess,
   requireIdentity,
 } from "../lib/auth";
@@ -128,191 +128,231 @@ async function resolveAssignedMember(
   };
 }
 
+const listTasksArgs = {
+  orgId: v.string(),
+  status: v.optional(taskStatusValidator),
+};
+
+export async function listTasksCore(
+  ctx: QueryCtx,
+  actor: Actor,
+  args: ObjectType<typeof listTasksArgs>,
+) {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
+  const status = args.status ?? "open";
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_orgId_and_status", (q) =>
+      q.eq("orgId", args.orgId).eq("status", status),
+    )
+    .order("desc")
+    .take(50);
+}
+
 export const list = query({
-  args: {
-    orgId: v.string(),
-    status: v.optional(taskStatusValidator),
-  },
+  args: listTasksArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-    const status = args.status ?? "open";
-    return await ctx.db
-      .query("tasks")
-      .withIndex("by_orgId_and_status", (q) =>
-        q.eq("orgId", args.orgId).eq("status", status),
-      )
-      .order("desc")
-      .take(50);
+    return await listTasksCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
+const createTaskArgs = {
+  orgId: v.string(),
+  meetingId: v.optional(v.id("meetings")),
+  title: v.string(),
+  assigneeTokenIdentifier: v.optional(v.string()),
+  dueAt: v.optional(v.number()),
+};
+
+export async function createTaskCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof createTaskArgs>,
+) {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
+  if (args.meetingId) {
+    await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  }
+
+  const assignee = await resolveAssignedMember(
+    ctx,
+    args.orgId,
+    args.assigneeTokenIdentifier,
+  );
+  const now = Date.now();
+
+  return await ctx.db.insert("tasks", {
+    orgId: args.orgId,
+    meetingId: args.meetingId,
+    title: args.title,
+    status: "open",
+    assigneeName: assignee.assigneeName,
+    assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
+    dueAt: args.dueAt,
+    source: "manual",
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
 export const create = mutation({
-  args: {
-    orgId: v.string(),
-    meetingId: v.optional(v.id("meetings")),
-    title: v.string(),
-    assigneeTokenIdentifier: v.optional(v.string()),
-    dueAt: v.optional(v.number()),
-  },
+  args: createTaskArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-    if (args.meetingId) {
-      await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
+    return await createTaskCore(ctx, actorFromIdentity(identity), args);
+  },
+});
+
+const createTasksFromSummaryArgs = {
+  orgId: v.string(),
+  meetingId: v.id("meetings"),
+  actionItems: v.array(
+    v.object({
+      title: v.string(),
+      assigneeName: v.optional(v.union(v.string(), v.null())),
+    }),
+  ),
+};
+
+export async function createTasksFromSummaryCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof createTasksFromSummaryArgs>,
+) {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
+  await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+
+  const normalizedItems = args.actionItems
+    .map((item) => ({
+      title: item.title.trim(),
+      assigneeName: item.assigneeName?.trim() || null,
+    }))
+    .filter((item) => item.title);
+
+  if (normalizedItems.length === 0) {
+    return [];
+  }
+
+  const existingTasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_meetingId", (q) => q.eq("meetingId", args.meetingId))
+    .take(100);
+
+  const existingTitleSet = new Set(
+    existingTasks.map((task) => task.title.trim().toLowerCase()),
+  );
+  const members = await listOrganizationMembers(ctx, args.orgId);
+  const memberLookup = buildMemberLookup(members);
+
+  const now = Date.now();
+  const createdTaskIds: Id<"tasks">[] = [];
+
+  for (const item of normalizedItems) {
+    const normalizedTitle = item.title.toLowerCase();
+    if (existingTitleSet.has(normalizedTitle)) {
+      continue;
     }
 
-    const assignee = await resolveAssignedMember(
-      ctx,
-      args.orgId,
-      args.assigneeTokenIdentifier,
-    );
-    const now = Date.now();
+    const suggestedAssigneeName = item.assigneeName || undefined;
+    const matchedMember = suggestedAssigneeName
+      ? memberLookup.get(normalizeLookupValue(suggestedAssigneeName)) ?? null
+      : null;
 
-    return await ctx.db.insert("tasks", {
+    const taskId = await ctx.db.insert("tasks", {
       orgId: args.orgId,
       meetingId: args.meetingId,
-      title: args.title,
+      title: item.title,
       status: "open",
-      assigneeName: assignee.assigneeName,
-      assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
-      dueAt: args.dueAt,
-      source: "manual",
+      assigneeName: matchedMember?.name,
+      assigneeTokenIdentifier: matchedMember?.tokenIdentifier,
+      suggestedAssigneeName:
+        suggestedAssigneeName && !matchedMember ? suggestedAssigneeName : undefined,
+      source: "summary",
       createdAt: now,
       updatedAt: now,
     });
-  },
-});
+
+    existingTitleSet.add(normalizedTitle);
+    createdTaskIds.push(taskId);
+  }
+
+  return createdTaskIds;
+}
 
 export const createFromSummary = mutation({
-  args: {
-    orgId: v.string(),
-    meetingId: v.id("meetings"),
-    actionItems: v.array(
-      v.object({
-        title: v.string(),
-        assigneeName: v.optional(v.union(v.string(), v.null())),
-      }),
-    ),
-  },
+  args: createTasksFromSummaryArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-    await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-
-    const normalizedItems = args.actionItems
-      .map((item) => ({
-        title: item.title.trim(),
-        assigneeName: item.assigneeName?.trim() || null,
-      }))
-      .filter((item) => item.title);
-
-    if (normalizedItems.length === 0) {
-      return [];
-    }
-
-    const existingTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_meetingId", (q) => q.eq("meetingId", args.meetingId))
-      .take(100);
-
-    const existingTitleSet = new Set(
-      existingTasks.map((task) => task.title.trim().toLowerCase()),
-    );
-    const members = await listOrganizationMembers(ctx, args.orgId);
-    const memberLookup = buildMemberLookup(members);
-
-    const now = Date.now();
-    const createdTaskIds: Id<"tasks">[] = [];
-
-    for (const item of normalizedItems) {
-      const normalizedTitle = item.title.toLowerCase();
-      if (existingTitleSet.has(normalizedTitle)) {
-        continue;
-      }
-
-      const suggestedAssigneeName = item.assigneeName || undefined;
-      const matchedMember = suggestedAssigneeName
-        ? memberLookup.get(normalizeLookupValue(suggestedAssigneeName)) ?? null
-        : null;
-
-      const taskId = await ctx.db.insert("tasks", {
-        orgId: args.orgId,
-        meetingId: args.meetingId,
-        title: item.title,
-        status: "open",
-        assigneeName: matchedMember?.name,
-        assigneeTokenIdentifier: matchedMember?.tokenIdentifier,
-        suggestedAssigneeName:
-          suggestedAssigneeName && !matchedMember ? suggestedAssigneeName : undefined,
-        source: "summary",
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      existingTitleSet.add(normalizedTitle);
-      createdTaskIds.push(taskId);
-    }
-
-    return createdTaskIds;
+    return await createTasksFromSummaryCore(ctx, actorFromIdentity(identity), args);
   },
 });
 
+const updateTaskArgs = {
+  taskId: v.id("tasks"),
+  status: taskStatusValidator,
+  assigneeTokenIdentifier: v.optional(v.union(v.string(), v.null())),
+};
+
+export async function updateTaskCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof updateTaskArgs>,
+) {
+  const task = await ctx.db.get(args.taskId);
+
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  const currentUser = await assertOrgAccess(
+    ctx,
+    actor.tokenIdentifier,
+    task.orgId,
+  );
+  const assignee =
+    args.assigneeTokenIdentifier === undefined
+      ? {
+          assigneeName: task.assigneeName,
+          assigneeTokenIdentifier: task.assigneeTokenIdentifier,
+        }
+      : await resolveAssignedMember(ctx, task.orgId, args.assigneeTokenIdentifier);
+  const now = Date.now();
+
+  const patch: Partial<Doc<"tasks">> = {
+    status: args.status,
+    assigneeName: assignee.assigneeName,
+    assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
+    updatedAt: now,
+  };
+
+  if (task.status !== "done" && args.status === "done") {
+    patch.completedAt = now;
+    patch.completedByTokenIdentifier = actor.tokenIdentifier;
+    patch.completedByName =
+      getMemberDisplayName(currentUser) ?? actor.displayName;
+  } else if (task.status === "done" && args.status !== "done") {
+    patch.completedAt = undefined;
+    patch.completedByTokenIdentifier = undefined;
+    patch.completedByName = undefined;
+  }
+
+  if (
+    args.assigneeTokenIdentifier !== undefined
+    && assignee.assigneeTokenIdentifier
+  ) {
+    patch.suggestedAssigneeName = undefined;
+  }
+
+  await ctx.db.patch(task._id, patch);
+  return task._id;
+}
+
 export const updateTask = mutation({
-  args: {
-    taskId: v.id("tasks"),
-    status: taskStatusValidator,
-    assigneeTokenIdentifier: v.optional(v.union(v.string(), v.null())),
-  },
+  args: updateTaskArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const task = await ctx.db.get(args.taskId);
-
-    if (!task) {
-      throw new Error("Task not found");
-    }
-
-    const currentUser = await assertOrgAccess(
-      ctx,
-      identity.tokenIdentifier,
-      task.orgId,
-    );
-    const assignee =
-      args.assigneeTokenIdentifier === undefined
-        ? {
-            assigneeName: task.assigneeName,
-            assigneeTokenIdentifier: task.assigneeTokenIdentifier,
-          }
-        : await resolveAssignedMember(ctx, task.orgId, args.assigneeTokenIdentifier);
-    const now = Date.now();
-
-    const patch: Partial<Doc<"tasks">> = {
-      status: args.status,
-      assigneeName: assignee.assigneeName,
-      assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
-      updatedAt: now,
-    };
-
-    if (task.status !== "done" && args.status === "done") {
-      patch.completedAt = now;
-      patch.completedByTokenIdentifier = identity.tokenIdentifier;
-      patch.completedByName =
-        getMemberDisplayName(currentUser) ?? getIdentityName(identity);
-    } else if (task.status === "done" && args.status !== "done") {
-      patch.completedAt = undefined;
-      patch.completedByTokenIdentifier = undefined;
-      patch.completedByName = undefined;
-    }
-
-    if (
-      args.assigneeTokenIdentifier !== undefined
-      && assignee.assigneeTokenIdentifier
-    ) {
-      patch.suggestedAssigneeName = undefined;
-    }
-
-    await ctx.db.patch(task._id, patch);
-    return task._id;
+    return await updateTaskCore(ctx, actorFromIdentity(identity), args);
   },
 });
 

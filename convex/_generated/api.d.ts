@@ -30,6 +30,7 @@ import type * as integrations_index from "../integrations/index.js";
 import type * as invitationEmailState from "../invitationEmailState.js";
 import type * as invitationsDelivery from "../invitationsDelivery.js";
 import type * as invitations_index from "../invitations/index.js";
+import type * as lib_actor from "../lib/actor.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_connectorFields from "../lib/connectorFields.js";
 import type * as lib_errors from "../lib/errors.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   invitationEmailState: typeof invitationEmailState;
   invitationsDelivery: typeof invitationsDelivery;
   "invitations/index": typeof invitations_index;
+  "lib/actor": typeof lib_actor;
   "lib/auth": typeof lib_auth;
   "lib/connectorFields": typeof lib_connectorFields;
   "lib/errors": typeof lib_errors;

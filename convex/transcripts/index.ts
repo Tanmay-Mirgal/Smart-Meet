@@ -1,5 +1,7 @@
 import { query, mutation } from "../_generated/server";
-import { v } from "convex/values";
+import type { QueryCtx } from "../_generated/server";
+import { v, type ObjectType } from "convex/values";
+import { actorFromIdentity, type Actor } from "../lib/actor";
 import { assertMeetingAccess, requireIdentity } from "../lib/auth";
 import { getMeetingParticipant } from "../lib/meetinghelpers";
 
@@ -91,17 +93,27 @@ export const addBatch = mutation({
   },
 });
 
+const listTranscriptArgs = { meetingId: v.id("meetings") };
+
+export async function listTranscriptCore(
+  ctx: QueryCtx,
+  actor: Actor,
+  args: ObjectType<typeof listTranscriptArgs>,
+) {
+  await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
+  return await ctx.db
+    .query("transcripts")
+    .withIndex("by_meetingId_and_timestamp", (q) =>
+      q.eq("meetingId", args.meetingId),
+    )
+    .order("asc")
+    .take(200);
+}
+
 export const list = query({
-  args: { meetingId: v.id("meetings") },
+  args: listTranscriptArgs,
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertMeetingAccess(ctx, identity.tokenIdentifier, args.meetingId);
-    return await ctx.db
-      .query("transcripts")
-      .withIndex("by_meetingId_and_timestamp", (q) =>
-        q.eq("meetingId", args.meetingId),
-      )
-      .order("asc")
-      .take(200);
+    return await listTranscriptCore(ctx, actorFromIdentity(identity), args);
   },
 });

@@ -7,8 +7,10 @@ import {
   mutation,
   query,
 } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
+import { actorFromIdentity, type Actor } from "../lib/actor";
 import { assertMeetingAccess, assertOrgAccess, requireIdentity } from "../lib/auth";
 import { normalizeInviteEmail, resolveInviteStatus } from "../lib/invitations";
 import {
@@ -1278,59 +1280,77 @@ async function exchangeGoogleRefreshToken(connection: GoogleConnection) {
   };
 }
 
+/**
+ * Shared by the public query below and by `meetings.create`'s core, which used
+ * to reach it through a nested `ctx.runQuery(api…)` call (that needs a Clerk
+ * identity and so cannot run on the connector path). NEVER return the stored
+ * access/refresh tokens from here — `hasRefreshToken` is a boolean on purpose.
+ */
+export async function getGoogleCalendarConnectionCore(
+  ctx: QueryCtx | MutationCtx,
+  actor: Actor,
+  orgId: string,
+) {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, orgId);
+
+  const connection = await ctx.db
+    .query("user_integrations")
+    .withIndex("by_userTokenIdentifier_and_provider", (q) =>
+      q
+        .eq("userTokenIdentifier", actor.tokenIdentifier)
+        .eq("provider", GOOGLE_PROVIDER),
+    )
+    .unique();
+
+  if (!connection || connection.status === "revoked") {
+    return {
+      connected: false,
+      provider: GOOGLE_PROVIDER,
+      hasRefreshToken: false,
+      hasGoogleClientId: Boolean(process.env.GOOGLE_CLIENT_ID),
+      hasGoogleClientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      hasConfiguredCalendarId: Boolean(process.env.GOOGLE_CALENDAR_ID),
+      publicAppUrlConfigured: Boolean(getPublicAppUrl()),
+      publicAppUrl: getPublicAppUrl() ?? undefined,
+    } as const;
+  }
+
+  const hasAuthError = !isUsableGoogleCalendarConnection(connection);
+  const warning =
+    connection.lastError && !hasAuthError ? connection.lastError : undefined;
+  const publicAppUrl = getPublicAppUrl();
+
+  return {
+    connected: !hasAuthError,
+    provider: GOOGLE_PROVIDER,
+    accountEmail: connection.accountEmail,
+    status: hasAuthError ? "error" : "connected",
+    scope: connection.scope,
+    tokenExpiresAt: connection.tokenExpiresAt,
+    connectedAt: connection.connectedAt,
+    updatedAt: connection.updatedAt,
+    lastError: hasAuthError ? connection.lastError : undefined,
+    warning,
+    hasRefreshToken: Boolean(connection.refreshToken),
+    hasGoogleClientId: Boolean(process.env.GOOGLE_CLIENT_ID),
+    hasGoogleClientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+    hasConfiguredCalendarId: Boolean(process.env.GOOGLE_CALENDAR_ID),
+    publicAppUrlConfigured: Boolean(publicAppUrl),
+    publicAppUrl: publicAppUrl ?? undefined,
+  } as const;
+}
+
 export const getGoogleCalendarConnection = query({
   args: {
     orgId: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-
-    const connection = await ctx.db
-      .query("user_integrations")
-      .withIndex("by_userTokenIdentifier_and_provider", (q) =>
-        q
-          .eq("userTokenIdentifier", identity.tokenIdentifier)
-          .eq("provider", GOOGLE_PROVIDER),
-      )
-      .unique();
-
-    if (!connection || connection.status === "revoked") {
-      return {
-        connected: false,
-        provider: GOOGLE_PROVIDER,
-        hasRefreshToken: false,
-        hasGoogleClientId: Boolean(process.env.GOOGLE_CLIENT_ID),
-        hasGoogleClientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
-        hasConfiguredCalendarId: Boolean(process.env.GOOGLE_CALENDAR_ID),
-        publicAppUrlConfigured: Boolean(getPublicAppUrl()),
-        publicAppUrl: getPublicAppUrl() ?? undefined,
-      } as const;
-    }
-
-    const hasAuthError = !isUsableGoogleCalendarConnection(connection);
-    const warning =
-      connection.lastError && !hasAuthError ? connection.lastError : undefined;
-    const publicAppUrl = getPublicAppUrl();
-
-    return {
-      connected: !hasAuthError,
-      provider: GOOGLE_PROVIDER,
-      accountEmail: connection.accountEmail,
-      status: hasAuthError ? "error" : "connected",
-      scope: connection.scope,
-      tokenExpiresAt: connection.tokenExpiresAt,
-      connectedAt: connection.connectedAt,
-      updatedAt: connection.updatedAt,
-      lastError: hasAuthError ? connection.lastError : undefined,
-      warning,
-      hasRefreshToken: Boolean(connection.refreshToken),
-      hasGoogleClientId: Boolean(process.env.GOOGLE_CLIENT_ID),
-      hasGoogleClientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
-      hasConfiguredCalendarId: Boolean(process.env.GOOGLE_CALENDAR_ID),
-      publicAppUrlConfigured: Boolean(publicAppUrl),
-      publicAppUrl: publicAppUrl ?? undefined,
-    } as const;
+    return await getGoogleCalendarConnectionCore(
+      ctx,
+      actorFromIdentity(identity),
+      args.orgId,
+    );
   },
 });
 

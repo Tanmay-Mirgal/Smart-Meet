@@ -1,5 +1,7 @@
 import { query, mutation } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
+import { actorFromIdentity, type Actor } from "../lib/actor";
 import { assertOrgAccess, requireIdentity } from "../lib/auth";
 
 const DEFAULT_STARTER_BILLING = {
@@ -104,67 +106,84 @@ export const syncOrganizationBillingSnapshot = mutation({
   },
 });
 
+export type OrganizationPlan = {
+  planKey: "starter" | "custom" | "pro";
+  planName: string;
+  maxMeetings: number | null;
+  features: {
+    unlimitedMeetings: boolean;
+    aiSummary: boolean;
+    notionExport: boolean;
+    recording: boolean;
+    googleCalendarSync: boolean;
+  };
+  usage: {
+    meetingsUsed: number;
+    meetingsRemaining: number | null;
+    meetingsLimitReached: boolean;
+  };
+  syncedAt: number | null;
+  expiresAt: number | null;
+};
+
+/** Plan + usage for an org. Performs NO access check — callers must have done so. */
+export async function computeOrganizationPlan(
+  ctx: QueryCtx | MutationCtx,
+  orgId: string,
+): Promise<OrganizationPlan> {
+  const snapshot = await ctx.db
+    .query("organization_billing_snapshots")
+    .withIndex("by_orgId", (q) => q.eq("orgId", orgId))
+    .unique();
+
+  const billing = resolveBillingPlan(snapshot);
+  const usageProbeLimit =
+    typeof billing.maxMeetings === "number"
+      ? billing.maxMeetings + 1
+      : 1;
+  const meetings = await ctx.db
+    .query("meetings")
+    .withIndex("by_orgId", (q) => q.eq("orgId", orgId))
+    .take(usageProbeLimit);
+
+  const meetingsUsed =
+    typeof billing.maxMeetings === "number"
+      ? Math.min(meetings.length, billing.maxMeetings)
+      : 0;
+  const meetingsLimitReached =
+    typeof billing.maxMeetings === "number"
+    && meetings.length >= billing.maxMeetings;
+
+  return {
+    ...billing,
+    usage: {
+      meetingsUsed,
+      meetingsRemaining:
+        typeof billing.maxMeetings === "number"
+          ? Math.max(0, billing.maxMeetings - meetingsUsed)
+          : null,
+      meetingsLimitReached,
+    },
+    syncedAt: snapshot?.syncedAt ?? null,
+    expiresAt: snapshot?.expiresAt ?? null,
+  };
+}
+
+export async function getOrganizationPlanCore(
+  ctx: QueryCtx | MutationCtx,
+  actor: Actor,
+  orgId: string,
+): Promise<OrganizationPlan> {
+  await assertOrgAccess(ctx, actor.tokenIdentifier, orgId);
+  return await computeOrganizationPlan(ctx, orgId);
+}
+
 export const getOrganizationPlan = query({
   args: {
     orgId: v.string(),
   },
-  handler: async (ctx, args): Promise<{
-    planKey: "starter" | "custom" | "pro";
-    planName: string;
-    maxMeetings: number | null;
-    features: {
-      unlimitedMeetings: boolean;
-      aiSummary: boolean;
-      notionExport: boolean;
-      recording: boolean;
-      googleCalendarSync: boolean;
-    };
-    usage: {
-      meetingsUsed: number;
-      meetingsRemaining: number | null;
-      meetingsLimitReached: boolean;
-    };
-    syncedAt: number | null;
-    expiresAt: number | null;
-  }> => {
+  handler: async (ctx, args): Promise<OrganizationPlan> => {
     const identity = await requireIdentity(ctx);
-    await assertOrgAccess(ctx, identity.tokenIdentifier, args.orgId);
-
-    const snapshot = await ctx.db
-      .query("organization_billing_snapshots")
-      .withIndex("by_orgId", (q) => q.eq("orgId", args.orgId))
-      .unique();
-
-    const billing = resolveBillingPlan(snapshot);
-    const usageProbeLimit =
-      typeof billing.maxMeetings === "number"
-        ? billing.maxMeetings + 1
-        : 1;
-    const meetings = await ctx.db
-      .query("meetings")
-      .withIndex("by_orgId", (q) => q.eq("orgId", args.orgId))
-      .take(usageProbeLimit);
-
-    const meetingsUsed =
-      typeof billing.maxMeetings === "number"
-        ? Math.min(meetings.length, billing.maxMeetings)
-        : 0;
-    const meetingsLimitReached =
-      typeof billing.maxMeetings === "number"
-      && meetings.length >= billing.maxMeetings;
-
-    return {
-      ...billing,
-      usage: {
-        meetingsUsed,
-        meetingsRemaining:
-          typeof billing.maxMeetings === "number"
-            ? Math.max(0, billing.maxMeetings - meetingsUsed)
-            : null,
-        meetingsLimitReached,
-      },
-      syncedAt: snapshot?.syncedAt ?? null,
-      expiresAt: snapshot?.expiresAt ?? null,
-    };
+    return await getOrganizationPlanCore(ctx, actorFromIdentity(identity), args.orgId);
   },
 });
