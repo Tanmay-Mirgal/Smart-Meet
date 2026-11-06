@@ -1,9 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { computeOrganizationPlan } from "../billing/index";
-import type { Actor } from "../lib/actor";
 import {
   assertMeetingAccess,
   getCurrentUserRecord,
@@ -14,7 +12,9 @@ import { listAllMeetingParticipants } from "../lib/meetinghelpers";
 import { getDefaultMeetingSettings } from "../lib/meetingPermissions";
 import { webUrl } from "./config";
 import { SubjectCache, iso, isoOpt, toMeetingEntity, toTaskEntity } from "./entities";
-import { notFound, toConvexError } from "./errors";
+import { loadMeetingInOrg, missing } from "./access";
+import { ConnectorError, toConvexError } from "./errors";
+import { getAction } from "./registry";
 import { loadActiveGrant } from "./grantAccess";
 import { buildMediaUrl } from "./mediaUrl";
 import {
@@ -40,25 +40,6 @@ import { getTenantInfo, getUserInfo } from "./subject";
 
 const base = { grantId: v.id("connector_grants"), now: v.number() };
 const page = { limit: v.number(), cursor: v.optional(v.string()) };
-
-function missing(what: string): never {
-  throw toConvexError(notFound(`${what} not found`));
-}
-
-async function loadMeeting(
-  ctx: QueryCtx,
-  grant: Doc<"connector_grants">,
-  actor: Actor,
-  rawId: string,
-): Promise<Doc<"meetings">> {
-  const id = ctx.db.normalizeId("meetings", rawId);
-  const meeting = id ? await ctx.db.get(id) : null;
-  if (!meeting || meeting.orgId !== grant.orgId) return missing("Meeting");
-  // Same rule the UI applies (throws "Forbidden" → 403, which cannot happen for
-  // an org member but keeps the rule in one place).
-  await assertMeetingAccess(ctx, actor.tokenIdentifier, meeting._id);
-  return meeting;
-}
 
 export const me = internalQuery({
   args: base,
@@ -88,6 +69,49 @@ export const me = internalQuery({
         meetingsUsed: plan.usage.meetingsUsed,
         meetingsCap: plan.maxMeetings,
       },
+    };
+  },
+});
+
+/** Operations are owned by the grant that started them and kept for 7 days. */
+const OPERATION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const operationGet = internalQuery({
+  args: { ...base, id: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const { grant } = await loadActiveGrant(ctx, args.grantId, args.now);
+    const id = ctx.db.normalizeId("connector_operations", args.id);
+    const operation = id ? await ctx.db.get(id) : null;
+    if (
+      !operation ||
+      operation.grantId !== grant._id ||
+      args.now - operation.createdAt > OPERATION_RETENTION_MS
+    ) {
+      return missing("Operation");
+    }
+
+    // Same scopes as the action that created it (CP1 §4).
+    const needed = getAction(operation.action)?.scopes ?? [];
+    const lacking = needed.find((scope) => !grant.scopes.includes(scope));
+    if (lacking) {
+      throw toConvexError(
+        new ConnectorError(
+          "insufficient_scope",
+          `This connection was not granted the ${lacking} scope.`,
+          { extras: { requiredScope: lacking } },
+        ),
+      );
+    }
+
+    return {
+      id: String(operation._id),
+      action: operation.action,
+      status: operation.status,
+      output: operation.output,
+      error: operation.error,
+      createdAt: iso(operation.createdAt),
+      finishedAt: isoOpt(operation.finishedAt),
     };
   },
 });
@@ -223,7 +247,7 @@ export const meetingsGet = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
 
     const participants = await listAllMeetingParticipants(ctx, meeting._id);
     const summary = await ctx.db
@@ -270,7 +294,7 @@ export const meetingsParticipants = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
 
     const cursor = decodeCursor(
       args.cursor,
@@ -323,7 +347,7 @@ export const meetingsTranscript = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
 
     const cursor = decodeCursor(
       args.cursor,
@@ -375,7 +399,7 @@ export const meetingsSummary = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
 
     const asset = await ctx.db
       .query("meeting_assets")
@@ -402,7 +426,7 @@ export const meetingsRecordings = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
     const before = decodeCursor(args.cursor, isTimeCursor);
 
     const rows = await ctx.db
@@ -471,7 +495,7 @@ export const meetingsWhiteboard = internalQuery({
   returns: v.any(),
   handler: async (ctx, args) => {
     const { grant, actor } = await loadActiveGrant(ctx, args.grantId, args.now);
-    const meeting = await loadMeeting(ctx, grant, actor, args.id);
+    const meeting = await loadMeetingInOrg(ctx, grant, actor, args.id);
 
     const whiteboard = await ctx.db
       .query("meeting_whiteboards")
@@ -521,7 +545,7 @@ export const tasksList = internalQuery({
 
     let meetingId: Id<"meetings"> | undefined;
     if (args.meetingId) {
-      meetingId = (await loadMeeting(ctx, grant, actor, args.meetingId))._id;
+      meetingId = (await loadMeetingInOrg(ctx, grant, actor, args.meetingId))._id;
     }
 
     let assigneeToken: string | undefined;

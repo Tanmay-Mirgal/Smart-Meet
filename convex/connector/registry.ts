@@ -274,7 +274,8 @@ export const ACTIONS = [
   },
   {
     name: "meetings.invite",
-    description: "Invite people to a meeting by email. Already-invited addresses are skipped.",
+    description:
+      "Invite people to a meeting by email. Already-invited addresses are skipped. Same rule as the Meetup UI: the connected user must be a host or co-host AND present in the meeting (joined), otherwise 403 forbidden — a connector never bypasses it. To invite people at creation time, use inviteEmails on meetings.create instead.",
     scopes: ["meetup:meetings:write"],
     async: false,
     idempotent: true,

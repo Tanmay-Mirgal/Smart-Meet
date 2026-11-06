@@ -187,7 +187,7 @@ describe("typed errors keep the UI's exact messages", () => {
     expect(normalizeError(error)).toMatchObject({
       code: "precondition_failed",
       status: 412,
-      extras: { fixUrl: "/integrations" },
+      extras: { fixUrl: expect.stringMatching(/^https?:\/\/.+\/integrations$/) },
     });
   });
 

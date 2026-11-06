@@ -16,6 +16,16 @@ export const modules = import.meta.glob([
   "!../../convex/**/*.d.ts",
 ]);
 
+/**
+ * Loads every Convex module once, up front. `convex-test` imports modules lazily
+ * and `finishAllScheduledFunctions` pumps timers a fixed number of times, so a
+ * cold import inside a scheduled action can make it give up and leave a stray
+ * scheduled function running into the next test.
+ */
+export async function warmModules() {
+  await Promise.all(Object.values(modules).map((load) => load()));
+}
+
 export const TEST_PEPPER = "test-pepper-".padEnd(48, "x");
 export const TEST_ENCRYPTION_KEY = "0123456789abcdef".repeat(4);
 export const TEST_CLIENT_ID = "hub-client";

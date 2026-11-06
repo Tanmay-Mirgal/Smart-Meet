@@ -136,7 +136,7 @@ describe("normalizeError maps core errors", () => {
     expect(normalizeError(new PlanLimitError("cap", { limit: 10 })).code).toBe("plan_limit");
     const pre = normalizeError(new PreconditionError("connect google", "/integrations"));
     expect(pre.code).toBe("precondition_failed");
-    expect(pre.extras?.fixUrl).toBe("/integrations");
+    expect(pre.extras?.fixUrl).toMatch(/^https?:\/\/.+\/integrations$/);
     expect(normalizeError(new InputError("bad", "scheduledFor")).details).toEqual([
       { path: "scheduledFor", message: "bad" },
     ]);

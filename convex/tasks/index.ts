@@ -3,6 +3,7 @@ import { v, type ObjectType } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { actorFromIdentity, type Actor } from "../lib/actor";
+import type { ExternalRef } from "../lib/connectorFields";
 import {
   assertMeetingAccess,
   assertOrgAccess,
@@ -165,10 +166,18 @@ const createTaskArgs = {
   dueAt: v.optional(v.number()),
 };
 
+/** What the browser sends, plus optional fields only the connector sets. */
+export type CreateTaskInput = ObjectType<typeof createTaskArgs> & {
+  suggestedAssigneeName?: string;
+  createdVia?: "connector";
+  externalRef?: ExternalRef;
+  metadataJson?: string;
+};
+
 export async function createTaskCore(
   ctx: MutationCtx,
   actor: Actor,
-  args: ObjectType<typeof createTaskArgs>,
+  args: CreateTaskInput,
 ) {
   await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
   if (args.meetingId) {
@@ -189,10 +198,14 @@ export async function createTaskCore(
     status: "open",
     assigneeName: assignee.assigneeName,
     assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
+    suggestedAssigneeName: args.suggestedAssigneeName,
     dueAt: args.dueAt,
     source: "manual",
     createdAt: now,
     updatedAt: now,
+    createdVia: args.createdVia,
+    externalRef: args.externalRef,
+    metadataJson: args.metadataJson,
   });
 }
 
@@ -215,10 +228,15 @@ const createTasksFromSummaryArgs = {
   ),
 };
 
+export type CreateTasksFromSummaryInput = ObjectType<typeof createTasksFromSummaryArgs> & {
+  createdVia?: "connector";
+  externalRef?: ExternalRef;
+};
+
 export async function createTasksFromSummaryCore(
   ctx: MutationCtx,
   actor: Actor,
-  args: ObjectType<typeof createTasksFromSummaryArgs>,
+  args: CreateTasksFromSummaryInput,
 ) {
   await assertOrgAccess(ctx, actor.tokenIdentifier, args.orgId);
   await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
@@ -271,6 +289,8 @@ export async function createTasksFromSummaryCore(
       source: "summary",
       createdAt: now,
       updatedAt: now,
+      createdVia: args.createdVia,
+      externalRef: args.externalRef,
     });
 
     existingTitleSet.add(normalizedTitle);
@@ -294,10 +314,21 @@ const updateTaskArgs = {
   assigneeTokenIdentifier: v.optional(v.union(v.string(), v.null())),
 };
 
+/**
+ * The browser always sends a status; the connector may update any subset of
+ * fields, so every field except the id is optional here.
+ */
+export type UpdateTaskInput = Omit<ObjectType<typeof updateTaskArgs>, "status"> & {
+  status?: ObjectType<typeof updateTaskArgs>["status"];
+  /** null clears the due date. */
+  dueAt?: number | null;
+  title?: string;
+};
+
 export async function updateTaskCore(
   ctx: MutationCtx,
   actor: Actor,
-  args: ObjectType<typeof updateTaskArgs>,
+  args: UpdateTaskInput,
 ) {
   const task = await ctx.db.get(args.taskId);
 
@@ -318,20 +349,28 @@ export async function updateTaskCore(
         }
       : await resolveAssignedMember(ctx, task.orgId, args.assigneeTokenIdentifier);
   const now = Date.now();
+  const nextStatus = args.status ?? task.status;
 
   const patch: Partial<Doc<"tasks">> = {
-    status: args.status,
+    status: nextStatus,
     assigneeName: assignee.assigneeName,
     assigneeTokenIdentifier: assignee.assigneeTokenIdentifier,
     updatedAt: now,
   };
 
-  if (task.status !== "done" && args.status === "done") {
+  if (args.title !== undefined) {
+    patch.title = args.title;
+  }
+  if (args.dueAt !== undefined) {
+    patch.dueAt = args.dueAt ?? undefined;
+  }
+
+  if (task.status !== "done" && nextStatus === "done") {
     patch.completedAt = now;
     patch.completedByTokenIdentifier = actor.tokenIdentifier;
     patch.completedByName =
       getMemberDisplayName(currentUser) ?? actor.displayName;
-  } else if (task.status === "done" && args.status !== "done") {
+  } else if (task.status === "done" && nextStatus !== "done") {
     patch.completedAt = undefined;
     patch.completedByTokenIdentifier = undefined;
     patch.completedByName = undefined;

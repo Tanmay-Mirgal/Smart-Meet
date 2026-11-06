@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { webUrl } from "./config";
 import {
   InputError,
   PlanLimitError,
@@ -181,7 +182,8 @@ export function normalizeError(error: unknown): ConnectorError {
 
   if (error instanceof PreconditionError) {
     return new ConnectorError("precondition_failed", error.message, {
-      extras: error.fixPath ? { fixUrl: error.fixPath } : undefined,
+      // The Hub is outside the app, so the link must be absolute.
+      extras: error.fixPath ? { fixUrl: webUrl(error.fixPath) } : undefined,
     });
   }
 

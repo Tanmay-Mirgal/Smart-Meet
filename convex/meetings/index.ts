@@ -1,6 +1,6 @@
 import { mutation, query } from "../_generated/server";
 import { v, type ObjectType } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { actorFromIdentity, type Actor } from "../lib/actor";
@@ -1064,11 +1064,22 @@ const saveSummaryArgs = {
   ),
 };
 
-export async function saveSummaryCore(
+export type SummaryInput = ObjectType<typeof saveSummaryArgs> & {
+  /** BCP-47 language of the text, when known (connector-generated summaries). */
+  language?: string;
+};
+
+/**
+ * Stores a summary and reports whether it DIFFERS from what was stored, plus
+ * its version. A summary's version starts at 1 and increases only when the
+ * saved content changes, so re-saving identical text does not create a new
+ * version. (`updatedAt` is still refreshed, exactly as before.)
+ */
+export async function persistSummary(
   ctx: MutationCtx,
   actor: Actor,
-  args: ObjectType<typeof saveSummaryArgs>,
-) {
+  args: SummaryInput,
+): Promise<{ version: number; changed: boolean; meeting: Doc<"meetings"> }> {
   const meeting = await assertMeetingAccess(ctx, actor.tokenIdentifier, args.meetingId);
   const billing = await getOrganizationPlanCore(ctx, actor, meeting.orgId);
 
@@ -1087,24 +1098,50 @@ export async function saveSummaryCore(
     .unique();
 
   if (existing) {
+    const changed =
+      existing.content !== args.summary ||
+      JSON.stringify(existing.key_points ?? null) !== JSON.stringify(args.key_points ?? null) ||
+      JSON.stringify(existing.decisions ?? null) !== JSON.stringify(args.decisions ?? null) ||
+      JSON.stringify(existing.action_items ?? null) !== JSON.stringify(args.action_items ?? null);
+    const version = (existing.summaryVersion ?? 1) + (changed ? 1 : 0);
+
     await ctx.db.patch(existing._id, {
       content: args.summary,
       key_points: args.key_points,
       decisions: args.decisions,
       action_items: args.action_items,
       updatedAt: Date.now(),
+      summaryVersion: version,
+      // New text from a caller that does not know the language must not keep a stale one.
+      ...(args.language !== undefined
+        ? { language: args.language }
+        : changed
+          ? { language: undefined }
+          : {}),
     });
-  } else {
-    await ctx.db.insert("meeting_assets", {
-      meetingId: args.meetingId,
-      type: "summary",
-      content: args.summary,
-      key_points: args.key_points,
-      decisions: args.decisions,
-      action_items: args.action_items,
-      updatedAt: Date.now(),
-    });
+    return { version, changed, meeting };
   }
+
+  await ctx.db.insert("meeting_assets", {
+    meetingId: args.meetingId,
+    type: "summary",
+    content: args.summary,
+    key_points: args.key_points,
+    decisions: args.decisions,
+    action_items: args.action_items,
+    updatedAt: Date.now(),
+    summaryVersion: 1,
+    language: args.language,
+  });
+  return { version: 1, changed: true, meeting };
+}
+
+export async function saveSummaryCore(
+  ctx: MutationCtx,
+  actor: Actor,
+  args: ObjectType<typeof saveSummaryArgs>,
+) {
+  await persistSummary(ctx, actor, args);
 }
 
 export const saveSummary = mutation({

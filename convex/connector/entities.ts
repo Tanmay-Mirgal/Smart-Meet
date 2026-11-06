@@ -1,5 +1,5 @@
 import type { Doc } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { webUrl } from "./config";
 import { getUserInfo, type UserInfo } from "./subject";
 
@@ -33,7 +33,7 @@ export const tasksUrl = () => webUrl("/tasks");
 export class SubjectCache {
   private readonly users = new Map<string, UserInfo>();
 
-  constructor(private readonly ctx: QueryCtx) {}
+  constructor(private readonly ctx: QueryCtx | MutationCtx) {}
 
   async user(tokenIdentifier: string): Promise<UserInfo> {
     const cached = this.users.get(tokenIdentifier);

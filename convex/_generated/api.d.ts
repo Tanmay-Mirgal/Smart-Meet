@@ -9,6 +9,11 @@
  */
 
 import type * as billing_index from "../billing/index.js";
+import type * as connector_access from "../connector/access.js";
+import type * as connector_actionRunner from "../connector/actionRunner.js";
+import type * as connector_actions from "../connector/actions.js";
+import type * as connector_operations from "../connector/operations.js";
+import type * as connector_summary from "../connector/summary.js";
 import type * as connector_entities from "../connector/entities.js";
 import type * as connector_mediaUrl from "../connector/mediaUrl.js";
 import type * as connector_pagination from "../connector/pagination.js";
@@ -71,6 +76,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "billing/index": typeof billing_index;
+  "connector/access": typeof connector_access;
+  "connector/actionRunner": typeof connector_actionRunner;
+  "connector/actions": typeof connector_actions;
+  "connector/operations": typeof connector_operations;
+  "connector/summary": typeof connector_summary;
   "connector/entities": typeof connector_entities;
   "connector/mediaUrl": typeof connector_mediaUrl;
   "connector/pagination": typeof connector_pagination;

@@ -18,9 +18,11 @@ import {
   errorResponse,
   getRequestId,
   jsonResponse,
+  jsonTextResponse,
   logLine,
   readBodyWithLimit,
 } from "./httpUtil";
+import { runAction } from "./actionRunner";
 import { buildManifest } from "./manifest";
 import { verifyMediaSignature } from "./mediaUrl";
 import { buildOpenApi } from "./openapi";
@@ -312,9 +314,29 @@ async function handleAuthenticated(
           headers,
         );
         break;
+      case "action": {
+        const outcome = await runAction(ctx, route, request, gate.grantId, now);
+        response = jsonTextResponse(outcome.status, outcome.response, requestId, {
+          ...headers,
+          ...(outcome.replayed ? { "Idempotent-Replay": "true" } : {}),
+        });
+        break;
+      }
+      case "operation":
+        response = jsonResponse(
+          200,
+          await ctx.runQuery(internal.connector.exec.operationGet, {
+            grantId: gate.grantId,
+            now,
+            id: route.params.id,
+          }),
+          requestId,
+          headers,
+        );
+        break;
       default:
-        // Action, webhook, event and operation endpoints arrive in the
-        // following phases; until then they simply do not exist.
+        // Webhook and event endpoints arrive in the next phase; until then
+        // they simply do not exist.
         throw new ConnectorError("not_found", "Unknown endpoint");
     }
     await audit(response.status);

@@ -36,6 +36,19 @@ export function jsonResponse(
   });
 }
 
+/** Like jsonResponse, for a body that is already serialized (e.g. a stored idempotent replay). */
+export function jsonTextResponse(
+  status: number,
+  bodyText: string,
+  requestId: string,
+  headers: Record<string, string> = {},
+): Response {
+  return new Response(bodyText, {
+    status,
+    headers: { ...BASE_HEADERS, "X-Request-Id": requestId, ...headers },
+  });
+}
+
 export function errorResponse(
   error: ConnectorError,
   requestId: string,
