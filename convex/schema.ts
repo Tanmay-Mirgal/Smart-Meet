@@ -6,6 +6,10 @@ import {
   meetingSettingsValidator,
   permissionsOverrideValidator,
 } from "./lib/meetingPermissions";
+import {
+  createdViaValidator,
+  externalRefValidator,
+} from "./lib/connectorFields";
 
 export default defineSchema({
   users: defineTable({
@@ -91,6 +95,11 @@ export default defineSchema({
     googleCalendarLastSyncedAt: v.optional(v.number()),
     googleCalendarSyncError: v.optional(v.string()),
     lastActivityAt: v.number(),
+    // Ecosystem connector (CP1) — additive, all optional.
+    createdVia: v.optional(createdViaValidator),
+    externalRef: v.optional(externalRefValidator),
+    // Caller-defined metadata, JSON-encoded, <= 2 KB.
+    metadataJson: v.optional(v.string()),
   })
     .index("by_orgId", ["orgId"])
     .index("by_orgId_and_status", ["orgId", "status"])
@@ -219,6 +228,9 @@ export default defineSchema({
     ),
     storageId: v.optional(v.id("_storage")),
     updatedAt: v.number(),
+    // Ecosystem connector (CP1) — bumped each time a *different* summary is saved.
+    summaryVersion: v.optional(v.number()),
+    language: v.optional(v.string()),
   }).index("by_meetingId_and_type", ["meetingId", "type"]),
 
   meeting_recordings: defineTable({
@@ -323,8 +335,13 @@ export default defineSchema({
     completedByName: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
+    // Ecosystem connector (CP1) — additive, all optional.
+    createdVia: v.optional(createdViaValidator),
+    externalRef: v.optional(externalRefValidator),
+    metadataJson: v.optional(v.string()),
   })
     .index("by_orgId_and_status", ["orgId", "status"])
+    .index("by_orgId", ["orgId"])
     .index("by_meetingId", ["meetingId"]),
 
   integrations: defineTable({
@@ -407,4 +424,206 @@ export default defineSchema({
   })
     .index("by_meetingId", ["meetingId"])
     .index("by_meetingId_and_chunkIndex", ["meetingId", "chunkIndex"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Ecosystem Connector Protocol v1 (CP1). See docs/CONNECTOR.md.
+  // None of these tables are touched unless CONNECTOR_ENABLED=true.
+  // Retention is enforced by the daily cron in convex/crons.ts.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Single-use OAuth authorization codes (TTL 60 s). Only the HMAC is stored.
+  connector_codes: defineTable({
+    codeHash: v.string(),
+    clientId: v.string(),
+    userTokenIdentifier: v.string(),
+    orgId: v.string(),
+    scopes: v.array(v.string()),
+    redirectUri: v.string(),
+    codeChallenge: v.string(),
+    expiresAt: v.number(),
+    // Set when the code is redeemed. A second redemption revokes `grantId`.
+    usedAt: v.optional(v.number()),
+    grantId: v.optional(v.id("connector_grants")),
+  })
+    .index("by_codeHash", ["codeHash"])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  // One grant = one user's consent for one org with a set of scopes. The grant
+  // row doubles as the refresh-token family: tokens rotate in place.
+  connector_grants: defineTable({
+    clientId: v.string(),
+    userTokenIdentifier: v.string(),
+    orgId: v.string(),
+    scopes: v.array(v.string()),
+    accessHash: v.string(),
+    accessExpiresAt: v.number(),
+    refreshHash: v.string(),
+    refreshExpiresAt: v.number(),
+    refreshFamilyId: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedReason: v.optional(v.string()),
+  })
+    .index("by_accessHash", ["accessHash"])
+    .index("by_refreshHash", ["refreshHash"])
+    .index("by_userTokenIdentifier_and_orgId", ["userTokenIdentifier", "orgId"])
+    .index("by_orgId_and_revokedAt", ["orgId", "revokedAt"])
+    .index("by_revokedAt", ["revokedAt"]),
+
+  // Tombstones of rotated refresh tokens so re-use can be detected exactly
+  // (token-family theft detection, RFC 6819 §5.2.2.3).
+  connector_refresh_history: defineTable({
+    refreshHash: v.string(),
+    grantId: v.id("connector_grants"),
+    retiredAt: v.number(),
+  })
+    .index("by_refreshHash", ["refreshHash"])
+    .index("by_grantId", ["grantId"])
+    .index("by_retiredAt", ["retiredAt"]),
+
+  connector_webhooks: defineTable({
+    grantId: v.id("connector_grants"),
+    orgId: v.string(),
+    url: v.string(),
+    // Exact event types or `prefix.*`.
+    events: v.array(v.string()),
+    description: v.optional(v.string()),
+    // AES-256-GCM, versioned. The plaintext secret is shown exactly once.
+    secretEnc: v.string(),
+    status: v.union(v.literal("active"), v.literal("disabled")),
+    disabledReason: v.optional(v.string()),
+    disabledAt: v.optional(v.number()),
+    consecutiveFailures: v.number(),
+    firstFailureAt: v.optional(v.number()),
+    lastDeliveryAt: v.optional(v.number()),
+    lastDeliveryStatus: v.optional(
+      v.union(v.literal("succeeded"), v.literal("failed")),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_grantId", ["grantId"])
+    .index("by_orgId_and_status", ["orgId", "status"]),
+
+  // Transactional outbox AND the per-org event log served by GET /events.
+  // `seq` is a gap-free, commit-ordered counter per org (see
+  // connector_event_counters) so pollers can never skip an event.
+  connector_events: defineTable({
+    orgId: v.string(),
+    seq: v.number(),
+    eventId: v.string(),
+    type: v.string(),
+    occurredAt: v.number(),
+    actor: v.object({
+      id: v.string(),
+      name: v.string(),
+      kind: v.union(
+        v.literal("user"),
+        v.literal("system"),
+        v.literal("connector"),
+      ),
+    }),
+    externalRef: v.optional(externalRefValidator),
+    data: v.any(),
+    // Used for exactly-once emission and in-place coalescing.
+    dedupeKey: v.optional(v.string()),
+  })
+    .index("by_orgId_and_seq", ["orgId", "seq"])
+    .index("by_orgId_and_type", ["orgId", "type"])
+    .index("by_orgId_and_dedupeKey", ["orgId", "dedupeKey"])
+    .index("by_eventId", ["eventId"]),
+
+  connector_event_counters: defineTable({
+    orgId: v.string(),
+    nextSeq: v.number(),
+  }).index("by_orgId", ["orgId"]),
+
+  connector_deliveries: defineTable({
+    eventId: v.id("connector_events"),
+    webhookId: v.id("connector_webhooks"),
+    orgId: v.string(),
+    // Stable across retries; sent as X-CP-Delivery.
+    deliveryUuid: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+    attempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    lastResponseCode: v.optional(v.number()),
+    lastResponseBody: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_status_and_nextAttemptAt", ["status", "nextAttemptAt"])
+    .index("by_webhookId", ["webhookId"])
+    .index("by_eventId", ["eventId"]),
+
+  connector_operations: defineTable({
+    grantId: v.id("connector_grants"),
+    orgId: v.string(),
+    action: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("canceled"),
+    ),
+    output: v.optional(v.any()),
+    error: v.optional(
+      v.object({ code: v.string(), message: v.string() }),
+    ),
+    createdAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  }).index("by_grantId", ["grantId"]),
+
+  connector_idempotency: defineTable({
+    grantId: v.id("connector_grants"),
+    key: v.string(),
+    requestHash: v.string(),
+    status: v.number(),
+    // JSON-encoded response body, replayed verbatim.
+    response: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_grantId_and_key", ["grantId", "key"])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  // Connector call log (CP1 §6). Never stores request payloads.
+  connector_audit: defineTable({
+    orgId: v.string(),
+    grantId: v.id("connector_grants"),
+    clientId: v.string(),
+    userTokenIdentifier: v.string(),
+    via: v.literal("connector"),
+    action: v.string(),
+    method: v.string(),
+    status: v.number(),
+    ok: v.boolean(),
+    errorCode: v.optional(v.string()),
+    requestId: v.string(),
+    meetingId: v.optional(v.id("meetings")),
+    createdAt: v.number(),
+  })
+    .index("by_orgId_and_createdAt", ["orgId", "createdAt"])
+    .index("by_grantId_and_createdAt", ["grantId", "createdAt"])
+    .index("by_createdAt", ["createdAt"]),
+
+  // Fixed-window rate limit counters, shared across all instances.
+  connector_ratelimits: defineTable({
+    grantId: v.id("connector_grants"),
+    // e.g. "rpm:29012345" (minute epoch) or "notif:29012345".
+    bucket: v.string(),
+    count: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_grantId_and_bucket", ["grantId", "bucket"])
+    .index("by_expiresAt", ["expiresAt"]),
 });

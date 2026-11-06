@@ -11,6 +11,18 @@ const securityHeaders = [
   },
 ];
 
+// Ecosystem Connector (CP1). When the flag is off no rewrite exists at all, so
+// /api/connect/* and the well-known document are ordinary 404s and the app
+// behaves exactly as before.
+const connectorEnabled = process.env.CONNECTOR_ENABLED === "true";
+const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim().replace(/\/+$/, "");
+
+if (connectorEnabled && !convexSiteUrl) {
+  throw new Error(
+    "CONNECTOR_ENABLED=true requires NEXT_PUBLIC_CONVEX_SITE_URL (the https://<deployment>.convex.site origin).",
+  );
+}
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -24,6 +36,26 @@ const nextConfig: NextConfig = {
     // lucide-react, recharts and date-fns are already optimised by default.
     optimizePackageImports: ["radix-ui", "@base-ui/react"],
   },
+  ...(connectorEnabled
+    ? {
+        // Server-to-server connector API: the logic lives in Convex httpActions
+        // (convex/connector/*); Next only proxies it so the Hub talks to the app
+        // domain. Rewrites keep the method, body and Authorization /
+        // Idempotency-Key headers, and the upstream status and headers.
+        async rewrites() {
+          return [
+            {
+              source: "/api/connect/v1/:path*",
+              destination: `${convexSiteUrl}/connect/v1/:path*`,
+            },
+            {
+              source: "/.well-known/ecosystem-connector.json",
+              destination: `${convexSiteUrl}/connect/v1/manifest`,
+            },
+          ];
+        },
+      }
+    : {}),
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

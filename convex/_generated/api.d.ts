@@ -9,6 +9,20 @@
  */
 
 import type * as billing_index from "../billing/index.js";
+import type * as connector_audit from "../connector/audit.js";
+import type * as connector_config from "../connector/config.js";
+import type * as connector_crypto from "../connector/crypto.js";
+import type * as connector_errors from "../connector/errors.js";
+import type * as connector_httpUtil from "../connector/httpUtil.js";
+import type * as connector_idempotency from "../connector/idempotency.js";
+import type * as connector_manifest from "../connector/manifest.js";
+import type * as connector_openapi from "../connector/openapi.js";
+import type * as connector_rateLimit from "../connector/rateLimit.js";
+import type * as connector_registry from "../connector/registry.js";
+import type * as connector_router from "../connector/router.js";
+import type * as connector_routes from "../connector/routes.js";
+import type * as connector_scopes from "../connector/scopes.js";
+import type * as connector_standard from "../connector/standard.js";
 import type * as dashboard_index from "../dashboard/index.js";
 import type * as http from "../http.js";
 import type * as insights_index from "../insights/index.js";
@@ -17,6 +31,8 @@ import type * as invitationEmailState from "../invitationEmailState.js";
 import type * as invitationsDelivery from "../invitationsDelivery.js";
 import type * as invitations_index from "../invitations/index.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_connectorFields from "../lib/connectorFields.js";
+import type * as lib_errors from "../lib/errors.js";
 import type * as lib_invitations from "../lib/invitations.js";
 import type * as lib_meetingPermissions from "../lib/meetingPermissions.js";
 import type * as lib_meetinghelpers from "../lib/meetinghelpers.js";
@@ -41,6 +57,20 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "billing/index": typeof billing_index;
+  "connector/audit": typeof connector_audit;
+  "connector/config": typeof connector_config;
+  "connector/crypto": typeof connector_crypto;
+  "connector/errors": typeof connector_errors;
+  "connector/httpUtil": typeof connector_httpUtil;
+  "connector/idempotency": typeof connector_idempotency;
+  "connector/manifest": typeof connector_manifest;
+  "connector/openapi": typeof connector_openapi;
+  "connector/rateLimit": typeof connector_rateLimit;
+  "connector/registry": typeof connector_registry;
+  "connector/router": typeof connector_router;
+  "connector/routes": typeof connector_routes;
+  "connector/scopes": typeof connector_scopes;
+  "connector/standard": typeof connector_standard;
   "dashboard/index": typeof dashboard_index;
   http: typeof http;
   "insights/index": typeof insights_index;
@@ -49,6 +79,8 @@ declare const fullApi: ApiFromModules<{
   invitationsDelivery: typeof invitationsDelivery;
   "invitations/index": typeof invitations_index;
   "lib/auth": typeof lib_auth;
+  "lib/connectorFields": typeof lib_connectorFields;
+  "lib/errors": typeof lib_errors;
   "lib/invitations": typeof lib_invitations;
   "lib/meetingPermissions": typeof lib_meetingPermissions;
   "lib/meetinghelpers": typeof lib_meetinghelpers;

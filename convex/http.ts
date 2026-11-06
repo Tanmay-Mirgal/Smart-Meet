@@ -2,8 +2,12 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
+import { registerConnectorRoutes } from "./connector/router";
 
 const http = httpRouter();
+
+// Ecosystem Connector (CP1). Every route answers 404 unless CONNECTOR_ENABLED=true.
+registerConnectorRoutes(http);
 
 type ClerkWebhookEvent = {
   type: string;
