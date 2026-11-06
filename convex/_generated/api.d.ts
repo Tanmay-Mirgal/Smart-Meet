@@ -9,6 +9,11 @@
  */
 
 import type * as billing_index from "../billing/index.js";
+import type * as connector_entities from "../connector/entities.js";
+import type * as connector_mediaUrl from "../connector/mediaUrl.js";
+import type * as connector_pagination from "../connector/pagination.js";
+import type * as connector_resources from "../connector/resources.js";
+import type * as connector_validate from "../connector/validate.js";
 import type * as connector_authorize from "../connector/authorize.js";
 import type * as connector_consent from "../connector/consent.js";
 import type * as connector_exec from "../connector/exec.js";
@@ -66,6 +71,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "billing/index": typeof billing_index;
+  "connector/entities": typeof connector_entities;
+  "connector/mediaUrl": typeof connector_mediaUrl;
+  "connector/pagination": typeof connector_pagination;
+  "connector/resources": typeof connector_resources;
+  "connector/validate": typeof connector_validate;
   "connector/authorize": typeof connector_authorize;
   "connector/consent": typeof connector_consent;
   "connector/exec": typeof connector_exec;

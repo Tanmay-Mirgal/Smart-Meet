@@ -90,10 +90,15 @@ export async function loadActiveGrant(
   ctx: QueryCtx | MutationCtx,
   grantId: Id<"connector_grants">,
   now: number,
+  options: { ignoreAccessExpiry?: boolean } = {},
 ): Promise<{ grant: Doc<"connector_grants">; actor: Actor }> {
   const grant = await ctx.db.get(grantId);
 
-  if (!grant || grant.revokedAt !== undefined || grant.accessExpiresAt <= now) {
+  if (
+    !grant ||
+    grant.revokedAt !== undefined ||
+    (!options.ignoreAccessExpiry && grant.accessExpiresAt <= now)
+  ) {
     return reject("unauthorized", "Missing or invalid access token");
   }
 

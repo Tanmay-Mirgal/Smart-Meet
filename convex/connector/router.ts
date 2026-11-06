@@ -1,6 +1,7 @@
 import type { HttpRouter } from "convex/server";
 import { httpAction, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import {
   CONVEX_API_PREFIX,
   CONNECTOR_VERSION,
@@ -21,8 +22,10 @@ import {
   readBodyWithLimit,
 } from "./httpUtil";
 import { buildManifest } from "./manifest";
+import { verifyMediaSignature } from "./mediaUrl";
 import { buildOpenApi } from "./openapi";
 import { rateLimitHeaders } from "./rateLimit";
+import { runResource } from "./resources";
 import {
   isPublicRoute,
   matchRoute,
@@ -301,9 +304,17 @@ async function handleAuthenticated(
           headers,
         );
         break;
+      case "resource":
+        response = jsonResponse(
+          200,
+          await runResource(ctx, route, request, gate.grantId, now),
+          requestId,
+          headers,
+        );
+        break;
       default:
-        // Resource, action, webhook, event and operation endpoints arrive in
-        // the following phases; until then they simply do not exist.
+        // Action, webhook, event and operation endpoints arrive in the
+        // following phases; until then they simply do not exist.
         throw new ConnectorError("not_found", "Unknown endpoint");
     }
     await audit(response.status);
@@ -317,6 +328,59 @@ async function handleAuthenticated(
     await audit(normalized.status, normalized.code);
     return errorResponse(normalized, requestId, headers);
   }
+}
+
+/**
+ * `GET /recordings/{id}/media?g&exp&sig` — the target of the short-lived signed
+ * playback links. Authenticated by the HMAC signature alone (it is opened by a
+ * player, not an API client), but the live grant, tenant and meeting access are
+ * re-checked, so revoking the connection kills outstanding links immediately.
+ */
+async function handleMedia(
+  ctx: ActionCtx,
+  request: Request,
+  recordingId: string,
+  requestId: string,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const now = Date.now();
+  const verified = await verifyMediaSignature(
+    recordingId,
+    {
+      g: url.searchParams.get("g"),
+      exp: url.searchParams.get("exp"),
+      sig: url.searchParams.get("sig"),
+    },
+    now,
+  );
+  if (!verified.ok) {
+    throw new ConnectorError("unauthorized", "This link is invalid or has expired");
+  }
+
+  const grantId = verified.grantId as Id<"connector_grants">;
+  const target = await ctx.runQuery(internal.connector.exec.mediaTarget, {
+    grantId,
+    now,
+    recordingId,
+  });
+
+  try {
+    await ctx.runMutation(internal.connector.gate.recordAudit, {
+      grantId,
+      action: "recordings.media",
+      method: "GET",
+      status: 302,
+      requestId,
+      now: Date.now(),
+    });
+  } catch (error) {
+    console.error("connector audit write failed", error);
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: { Location: target, "Cache-Control": "no-store", "X-Request-Id": requestId },
+  });
 }
 
 // ── entry point ──────────────────────────────────────────────────────────────
@@ -391,6 +455,8 @@ export async function handleConnectorRequest(
         return await handleToken(ctx, request, requestId, config);
       case "oauth.revoke":
         return await handleRevoke(ctx, request, requestId, config);
+      case "recording.media":
+        return await handleMedia(ctx, request, route.params.id, requestId);
       default:
         throw new ConnectorError("not_found", "Unknown endpoint");
     }

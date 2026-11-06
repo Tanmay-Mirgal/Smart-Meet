@@ -597,7 +597,8 @@ export const RESOURCES = [
   },
   {
     name: "insights.get",
-    description: "Dashboard aggregates for the organization over a time range.",
+    description:
+      "Dashboard aggregates for the organization over a time range. Bounded: meeting counts are capped at 500 and task counts at 1000 per status.",
     method: "GET",
     path: "/insights",
     scopes: ["meetup:meetings:read"],
