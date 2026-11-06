@@ -9,6 +9,10 @@ export const metadata = createMetadata({
   index: false,
 });
 
+// The flag below is read per request. Without this, a build made with the connector
+// off would prerender a permanent 404 (notFound() runs before searchParams is read).
+export const dynamic = "force-dynamic";
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function first(value: string | string[] | undefined) {

@@ -151,8 +151,16 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to view the 
 ## 🛠️ Build and Linting
 
 - **Run Linter**: `npm run lint`
+- **Type check**: `npm run typecheck`
+- **Run tests**: `npm test` (unit tests, Convex function tests and the ecosystem-connector conformance suite)
 - **Build Production App**: `npm run build`
 - **Start Production Server**: `npm run start`
+
+---
+
+## 🔌 Ecosystem connector
+
+Meetup can be connected to a central "Hub" (CP1 — Ecosystem Connector Protocol v1): schedule and end meetings, read transcripts, summaries, decisions and tasks, create tasks, and receive signed `meeting.summary.ready` webhooks. It is **off by default** (`CONNECTOR_ENABLED`) and changes nothing when off. See [`docs/CONNECTOR.md`](docs/CONNECTOR.md) for the API, the event catalog, security model and the production runbook, and `npm run connector:smoke` to check a running deployment.
 
 ---
 
