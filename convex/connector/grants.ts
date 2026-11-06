@@ -122,6 +122,20 @@ export const listForOrg = query({
   },
 });
 
+/**
+ * Name shown in "Created via <Hub>" tags. Env-only (no table reads), and only
+ * mounted by the tag, which only renders for things created through the connector.
+ */
+export const hubInfo = query({
+  args: {},
+  returns: v.object({ enabled: v.boolean(), hubName: v.string() }),
+  handler: async (ctx) => {
+    await requireIdentity(ctx);
+    const enabled = isConnectorEnabled() && getMissingConfig().length === 0;
+    return { enabled, hubName: enabled ? getConnectorConfig().hubName : "" };
+  },
+});
+
 export const revoke = mutation({
   args: { grantId: v.id("connector_grants") },
   returns: v.null(),

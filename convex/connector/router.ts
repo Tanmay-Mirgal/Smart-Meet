@@ -28,6 +28,7 @@ import { verifyMediaSignature } from "./mediaUrl";
 import { buildOpenApi } from "./openapi";
 import { rateLimitHeaders } from "./rateLimit";
 import { runResource } from "./resources";
+import { runWebhookRoute } from "./webhookRunner";
 import {
   isPublicRoute,
   matchRoute,
@@ -334,9 +335,23 @@ async function handleAuthenticated(
           headers,
         );
         break;
+      case "webhooks.create":
+      case "webhooks.list":
+      case "webhooks.get":
+      case "webhooks.update":
+      case "webhooks.delete":
+      case "webhooks.deliveries":
+      case "webhooks.redeliver":
+      case "events": {
+        const outcome = await runWebhookRoute(ctx, route, request, gate.grantId, now);
+        const extra = { ...headers, ...(outcome.replayed ? { "Idempotent-Replay": "true" } : {}) };
+        response =
+          outcome.text !== undefined
+            ? jsonTextResponse(outcome.status, outcome.text, requestId, extra)
+            : jsonResponse(outcome.status, outcome.body, requestId, extra);
+        break;
+      }
       default:
-        // Webhook and event endpoints arrive in the next phase; until then
-        // they simply do not exist.
         throw new ConnectorError("not_found", "Unknown endpoint");
     }
     await audit(response.status);

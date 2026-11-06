@@ -694,6 +694,12 @@ export const EVENTS = [
     }),
   },
   {
+    type: "invite.accepted",
+    description: "Someone accepted a meeting invitation by joining the meeting.",
+    scopes: ["meetup:meetings:read"],
+    data: z.object({ meeting: meetingRef, email: z.string() }),
+  },
+  {
     type: "task.created",
     description: "A task was created.",
     scopes: ["meetup:tasks:read"],

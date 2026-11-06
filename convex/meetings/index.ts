@@ -4,6 +4,12 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { actorFromIdentity, type Actor } from "../lib/actor";
+import { isConnectorEnabled } from "../connector/config";
+import {
+  emitMeetingLifecycle,
+  emitSummaryReady,
+  scheduleEndTriggers,
+} from "../connector/events";
 import { getOrganizationPlanCore } from "../billing/index";
 import { getGoogleCalendarConnectionCore } from "../integrations/index";
 import { InputError, PlanLimitError, PreconditionError } from "../lib/errors";
@@ -455,6 +461,19 @@ export async function createMeetingCore(
       internal.integrations.index.syncMeetingToGoogleCalendar,
       { meetingId },
     );
+  }
+
+  // Outbox: written in this same transaction (a single env check when disabled).
+  if (isConnectorEnabled()) {
+    const created = await ctx.db.get(meetingId);
+    if (created) {
+      await emitMeetingLifecycle(
+        ctx,
+        isScheduled ? "meeting.scheduled" : "meeting.started",
+        created,
+        actor,
+      );
+    }
   }
 
   return meetingId;
@@ -921,6 +940,14 @@ export async function endMeetingCore(
     actorName: participant?.name ?? actor.displayName,
     action: "meeting_ended",
   });
+
+  if (isConnectorEnabled()) {
+    const ended = await ctx.db.get(args.meetingId);
+    if (ended) {
+      await emitMeetingLifecycle(ctx, "meeting.ended", ended, actor);
+      await scheduleEndTriggers(ctx, ended);
+    }
+  }
 }
 
 export const endMeeting = mutation({
@@ -1119,6 +1146,17 @@ export async function persistSummary(
           ? { language: undefined }
           : {}),
     });
+    // Exactly once per summary version: only a DIFFERENT summary is a new version.
+    if (changed) {
+      await emitSummaryReady(ctx, actor, meeting, {
+        version,
+        summary: args.summary,
+        key_points: args.key_points,
+        decisions: args.decisions,
+        action_items: args.action_items,
+        language: args.language,
+      });
+    }
     return { version, changed, meeting };
   }
 
@@ -1131,6 +1169,14 @@ export async function persistSummary(
     action_items: args.action_items,
     updatedAt: Date.now(),
     summaryVersion: 1,
+    language: args.language,
+  });
+  await emitSummaryReady(ctx, actor, meeting, {
+    version: 1,
+    summary: args.summary,
+    key_points: args.key_points,
+    decisions: args.decisions,
+    action_items: args.action_items,
     language: args.language,
   });
   return { version: 1, changed: true, meeting };

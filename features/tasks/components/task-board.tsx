@@ -1,5 +1,6 @@
 "use client";
 
+import { CreatedViaBadge } from "@/features/connector/components/created-via-badge";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CheckCircle2, Circle, Clock3, GripVertical, Loader2, UserRound } from "lucide-react";
@@ -34,6 +35,8 @@ export type TaskRecord = {
   completedByName?: string;
   createdAt: number;
   updatedAt?: number;
+  /** Set when an ecosystem connector created the task. */
+  createdVia?: "connector";
 };
 
 type TaskBoardProps = {
@@ -257,6 +260,7 @@ export function TaskBoard({
                                 <span>
                                   Updated {formatTaskDate(task.updatedAt ?? task.createdAt)}
                                 </span>
+                                {task.createdVia === "connector" && <CreatedViaBadge />}
                                 {task.source === "summary" ? (
                                   <span>From meeting summary</span>
                                 ) : (

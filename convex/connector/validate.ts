@@ -1,5 +1,7 @@
 import type { z } from "zod";
-import { validationFailed } from "./errors";
+import { LIMITS } from "./config";
+import { ConnectorError, validationFailed } from "./errors";
+import { readBodyWithLimit } from "./httpUtil";
 import { stripUnknownFields, toJsonSchema } from "./registry";
 
 const jsonSchemaCache = new WeakMap<z.ZodType, Record<string, unknown>>();
@@ -40,4 +42,28 @@ export function parseInput<T extends z.ZodType>(
     );
   }
   return result.data;
+}
+
+/** `Idempotency-Key` header: absent, or 1–128 characters (CP1 §3). */
+export function readIdempotencyKey(request: Request): string | undefined {
+  const key = request.headers.get("idempotency-key") ?? undefined;
+  if (key !== undefined && (key.length === 0 || key.length > 128)) {
+    throw validationFailed("Idempotency-Key must be between 1 and 128 characters", [
+      { path: "Idempotency-Key", message: "Must be between 1 and 128 characters" },
+    ]);
+  }
+  return key;
+}
+
+/** Reads a JSON request body, enforcing the 1 MiB limit (413) and well-formedness (400). */
+export async function readJsonBody(request: Request): Promise<unknown> {
+  const body = await readBodyWithLimit(request, LIMITS.maxBodyBytes);
+  if (!body.ok) {
+    throw new ConnectorError("validation_failed", "Request body too large", { status: 413 });
+  }
+  try {
+    return JSON.parse(body.text);
+  } catch {
+    throw validationFailed("Request body must be valid JSON");
+  }
 }

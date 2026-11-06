@@ -43,6 +43,42 @@ export const bearer = (token: string, extra: Record<string, string> = {}) => ({
   ...extra,
 });
 
+/** Any request through the real HTTP handler; returns status, headers, raw text and parsed JSON. */
+export async function sendJson(
+  t: TestConvex,
+  token: string,
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+  headers: Record<string, string> = {},
+) {
+  const response = await t.fetch(`/connect/v1${path}`, {
+    method,
+    headers: {
+      ...bearer(token),
+      ...(body !== undefined ? { "content-type": "application/json" } : {}),
+      ...headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  return {
+    status: response.status,
+    headers: response.headers,
+    text,
+    body: text ? (JSON.parse(text) as Record<string, any>) : null, // eslint-disable-line @typescript-eslint/no-explicit-any
+  };
+}
+
+/** `POST /actions/{name}`. */
+export const act = (
+  t: TestConvex,
+  token: string,
+  name: string,
+  input: unknown,
+  headers: Record<string, string> = {},
+) => sendJson(t, token, "POST", `/actions/${name}`, { input }, headers);
+
 /** GET through the real HTTP handler; returns status, headers and parsed JSON. */
 export async function getJson(
   t: TestConvex,

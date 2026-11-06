@@ -22,6 +22,8 @@ export type Actor = {
   imageUrl?: string;
   /** `name ?? email ?? "Meetup User"` — what the UI shows for this person. */
   displayName: string;
+  /** Set when the action is performed through the ecosystem connector rather than the UI. */
+  via?: "connector";
 };
 
 export function actorFromIdentity(identity: UserIdentity): Actor {

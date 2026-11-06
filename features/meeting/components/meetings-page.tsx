@@ -1,5 +1,6 @@
 "use client";
 
+import { CreatedViaBadge } from "@/features/connector/components/created-via-badge";
 import Link from "next/link";
 import { useOrganization } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
@@ -28,6 +29,8 @@ type Meeting = {
   title: string;
   purpose: string;
   status: string;
+  /** Set when an ecosystem connector created the meeting. */
+  createdVia?: "connector";
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -89,6 +92,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
           <p className="truncate font-semibold text-foreground transition-colors group-hover:text-brand">
             {meeting.title}
           </p>
+          {meeting.createdVia === "connector" && <CreatedViaBadge className="hidden sm:inline-flex" />}
           {isActive && (
             <span className="hidden shrink-0 sm:inline">
               <StatusBadge status={meeting.status} />

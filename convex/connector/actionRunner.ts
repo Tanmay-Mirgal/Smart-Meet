@@ -2,12 +2,10 @@ import { z } from "zod";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
-import { LIMITS } from "./config";
-import { ConnectorError, validationFailed } from "./errors";
-import { readBodyWithLimit } from "./httpUtil";
+import { ConnectorError } from "./errors";
 import { getAction } from "./registry";
 import type { Route } from "./routes";
-import { parseInput, wantsIgnoreUnknown } from "./validate";
+import { parseInput, readIdempotencyKey, readJsonBody, wantsIgnoreUnknown } from "./validate";
 
 type ActionRoute = Extract<Route, { kind: "action" }>;
 
@@ -42,24 +40,8 @@ export async function runAction(
   const definition = getAction(route.params.name);
   if (!definition) throw new ConnectorError("not_found", "Unknown action");
 
-  const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
-  if (idempotencyKey !== undefined && (idempotencyKey.length === 0 || idempotencyKey.length > 128)) {
-    throw validationFailed("Idempotency-Key must be between 1 and 128 characters", [
-      { path: "Idempotency-Key", message: "Must be between 1 and 128 characters" },
-    ]);
-  }
-
-  const body = await readBodyWithLimit(request, LIMITS.maxBodyBytes);
-  if (!body.ok) {
-    throw new ConnectorError("validation_failed", "Request body too large", { status: 413 });
-  }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(body.text);
-  } catch {
-    throw validationFailed("Request body must be valid JSON");
-  }
+  const idempotencyKey = readIdempotencyKey(request);
+  const raw = await readJsonBody(request);
 
   const { input } = parseInput(envelopeFor(definition.name), raw, wantsIgnoreUnknown(request)) as {
     input: unknown;

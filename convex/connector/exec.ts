@@ -14,7 +14,8 @@ import { webUrl } from "./config";
 import { SubjectCache, iso, isoOpt, toMeetingEntity, toTaskEntity } from "./entities";
 import { loadMeetingInOrg, missing } from "./access";
 import { ConnectorError, toConvexError } from "./errors";
-import { getAction } from "./registry";
+import { toEnvelope } from "./eventEnvelope";
+import { getAction, getEventScopes, matchesAnyPattern } from "./registry";
 import { loadActiveGrant } from "./grantAccess";
 import { buildMediaUrl } from "./mediaUrl";
 import {
@@ -112,6 +113,62 @@ export const operationGet = internalQuery({
       error: operation.error,
       createdAt: iso(operation.createdAt),
       finishedAt: isoOpt(operation.finishedAt),
+    };
+  },
+});
+
+/**
+ * `GET /events` — the polling fallback (CP1 §4): the organization's event log in
+ * commit order, retained for 7 days. It serves the SAME envelopes webhooks carry
+ * and applies the SAME scope filter, so it can heal any missed webhook (C20).
+ * Cursors are positions in the per-org `seq`, which is gap-free, so a poller can
+ * never skip an event.
+ */
+const EVENT_LOG_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const EVENT_SCAN_CAP = 500;
+
+export const eventsList = internalQuery({
+  args: { ...base, ...page, types: v.optional(v.array(v.string())) },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const { grant } = await loadActiveGrant(ctx, args.grantId, args.now);
+    const after = decodeCursor(
+      args.cursor,
+      (value): value is { s: number } =>
+        typeof value === "object" &&
+        value !== null &&
+        typeof (value as { s?: unknown }).s === "number",
+    )?.s ?? 0;
+
+    const items = [];
+    let position = after;
+    let scanned = 0;
+    let hasMore = false;
+    const stream = ctx.db
+      .query("connector_events")
+      .withIndex("by_orgId_and_seq", (q) => q.eq("orgId", grant.orgId).gt("seq", after))
+      .order("asc");
+
+    for await (const event of stream) {
+      scanned += 1;
+      if (items.length === args.limit || scanned > EVENT_SCAN_CAP) {
+        hasMore = true; // another event (or unscanned ones) lies beyond this page
+        break;
+      }
+      position = event.seq;
+      if (args.now - event.occurredAt > EVENT_LOG_RETENTION_MS) continue;
+      if (args.types && !matchesAnyPattern(args.types, event.type)) continue;
+      // Only events this connection could read — same rule as webhook fan-out.
+      if (!getEventScopes(event.type).every((scope) => grant.scopes.includes(scope))) continue;
+      items.push(toEnvelope(event));
+    }
+
+    const here = encodeCursor({ s: position });
+    return {
+      items,
+      nextCursor: hasMore ? here : null,
+      // Where to resume polling later, even when this page is empty (additive field).
+      latestCursor: here,
     };
   },
 });

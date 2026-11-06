@@ -114,7 +114,8 @@ export async function loadActiveGrant(
     return reject("forbidden", "The connected user no longer exists in Meetup.");
   }
 
-  return { grant, actor };
+  // Marked so events caused by this call carry actor.kind = "connector".
+  return { grant, actor: { ...actor, via: "connector" } };
 }
 
 /** Looks up a grant row by its (hashed) access token. */

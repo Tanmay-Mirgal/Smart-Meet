@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+import { CreatedViaBadge } from "@/features/connector/components/created-via-badge";
 import { useAction, useQuery } from "convex/react";
 import ReactMarkdown from "react-markdown";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -167,6 +168,7 @@ export function MeetingDetailsPage({ meetingId }: { meetingId: Id<"meetings"> })
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {meeting.title}
           </h1>
+          {meeting.createdVia === "connector" && <CreatedViaBadge className="mt-2" />}
           {meeting.purpose && (
             <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {meeting.purpose}

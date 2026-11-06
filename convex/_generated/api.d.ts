@@ -9,6 +9,17 @@
  */
 
 import type * as billing_index from "../billing/index.js";
+import type * as connector_webhookRunner from "../connector/webhookRunner.js";
+import type * as connector_webhooks from "../connector/webhooks.js";
+import type * as connector_deliveryNode from "../connector/deliveryNode.js";
+import type * as connector_dispatch from "../connector/dispatch.js";
+import type * as connector_eventEnvelope from "../connector/eventEnvelope.js";
+import type * as connector_retention from "../connector/retention.js";
+import type * as connector_triggers from "../connector/triggers.js";
+import type * as crons from "../crons.js";
+import type * as connector_events from "../connector/events.js";
+import type * as connector_ssrf from "../connector/ssrf.js";
+import type * as connector_webhookTransport from "../connector/webhookTransport.js";
 import type * as connector_access from "../connector/access.js";
 import type * as connector_actionRunner from "../connector/actionRunner.js";
 import type * as connector_actions from "../connector/actions.js";
@@ -76,6 +87,17 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "billing/index": typeof billing_index;
+  "connector/webhookRunner": typeof connector_webhookRunner;
+  "connector/webhooks": typeof connector_webhooks;
+  "connector/deliveryNode": typeof connector_deliveryNode;
+  "connector/dispatch": typeof connector_dispatch;
+  "connector/eventEnvelope": typeof connector_eventEnvelope;
+  "connector/retention": typeof connector_retention;
+  "connector/triggers": typeof connector_triggers;
+  crons: typeof crons;
+  "connector/events": typeof connector_events;
+  "connector/ssrf": typeof connector_ssrf;
+  "connector/webhookTransport": typeof connector_webhookTransport;
   "connector/access": typeof connector_access;
   "connector/actionRunner": typeof connector_actionRunner;
   "connector/actions": typeof connector_actions;

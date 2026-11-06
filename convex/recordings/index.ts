@@ -4,6 +4,8 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { actorFromIdentity, type Actor } from "../lib/actor";
+import { isConnectorEnabled } from "../connector/config";
+import { emitRecordingEvent } from "../connector/events";
 import { assertMeetingAccess, requireIdentity } from "../lib/auth";
 import { getMeetingParticipant } from "../lib/meetinghelpers";
 import { hasMeetingPermission } from "../lib/meetingPermissions";
@@ -178,7 +180,7 @@ export const markReady = mutation({
     summaryAssetId: v.optional(v.id("meeting_assets")),
   },
   handler: async (ctx, args) => {
-    await requireRecordingPermission(ctx, args.meetingId);
+    const { identity } = await requireRecordingPermission(ctx, args.meetingId);
     const recording = await ctx.db.get(args.recordingId);
     if (!recording || recording.meetingId !== args.meetingId) {
       throw new Error("Recording not found");
@@ -208,6 +210,13 @@ export const markReady = mutation({
       updatedAt: Date.now(),
     });
 
+    if (isConnectorEnabled()) {
+      const ready = await ctx.db.get(args.recordingId);
+      if (ready) {
+        await emitRecordingEvent(ctx, "recording.ready", ready, actorFromIdentity(identity));
+      }
+    }
+
     return args.recordingId;
   },
 });
@@ -219,7 +228,7 @@ export const markFailed = mutation({
     errorMessage: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireRecordingPermission(ctx, args.meetingId);
+    const { identity } = await requireRecordingPermission(ctx, args.meetingId);
     const recording = await ctx.db.get(args.recordingId);
     if (!recording || recording.meetingId !== args.meetingId) {
       throw new Error("Recording not found");
@@ -230,6 +239,13 @@ export const markFailed = mutation({
       errorMessage: args.errorMessage,
       updatedAt: Date.now(),
     });
+
+    if (isConnectorEnabled()) {
+      const failed = await ctx.db.get(args.recordingId);
+      if (failed) {
+        await emitRecordingEvent(ctx, "recording.failed", failed, actorFromIdentity(identity));
+      }
+    }
     return args.recordingId;
   },
 });

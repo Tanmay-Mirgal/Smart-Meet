@@ -4,6 +4,8 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { actorFromIdentity, type Actor } from "../lib/actor";
 import type { ExternalRef } from "../lib/connectorFields";
+import { isConnectorEnabled } from "../connector/config";
+import { emitTaskEvent } from "../connector/events";
 import {
   assertMeetingAccess,
   assertOrgAccess,
@@ -191,7 +193,7 @@ export async function createTaskCore(
   );
   const now = Date.now();
 
-  return await ctx.db.insert("tasks", {
+  const taskId = await ctx.db.insert("tasks", {
     orgId: args.orgId,
     meetingId: args.meetingId,
     title: args.title,
@@ -207,6 +209,12 @@ export async function createTaskCore(
     externalRef: args.externalRef,
     metadataJson: args.metadataJson,
   });
+
+  if (isConnectorEnabled()) {
+    const created = await ctx.db.get(taskId);
+    if (created) await emitTaskEvent(ctx, "task.created", created, actor);
+  }
+  return taskId;
 }
 
 export const create = mutation({
@@ -295,6 +303,11 @@ export async function createTasksFromSummaryCore(
 
     existingTitleSet.add(normalizedTitle);
     createdTaskIds.push(taskId);
+
+    if (isConnectorEnabled()) {
+      const created = await ctx.db.get(taskId);
+      if (created) await emitTaskEvent(ctx, "task.created", created, actor);
+    }
   }
 
   return createdTaskIds;
@@ -384,6 +397,16 @@ export async function updateTaskCore(
   }
 
   await ctx.db.patch(task._id, patch);
+
+  if (isConnectorEnabled()) {
+    const updated = await ctx.db.get(task._id);
+    if (updated) {
+      await emitTaskEvent(ctx, "task.updated", updated, actor);
+      if (task.status !== "done" && nextStatus === "done") {
+        await emitTaskEvent(ctx, "task.completed", updated, actor);
+      }
+    }
+  }
   return task._id;
 }
 

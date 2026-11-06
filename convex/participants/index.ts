@@ -2,6 +2,9 @@ import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { actorFromIdentity } from "../lib/actor";
+import { isConnectorEnabled } from "../connector/config";
+import { emitInviteAccepted, emitMeetingLifecycle } from "../connector/events";
 import {
   assertMeetingAccess,
   getCurrentUserRecord,
@@ -191,6 +194,14 @@ export const join = mutation({
         startedAt: meeting.startedAt ?? now,
         lastActivityAt: now,
       });
+
+      // A scheduled meeting just went live: tell connected apps (outbox, same transaction).
+      if (isConnectorEnabled()) {
+        const started = await ctx.db.get(args.meetingId);
+        if (started) {
+          await emitMeetingLifecycle(ctx, "meeting.started", started, actorFromIdentity(identity));
+        }
+      }
     }
 
     const nextRole =
@@ -260,6 +271,10 @@ export const join = mutation({
         acceptedAt: now,
         respondedAt: now,
       });
+
+      if (isConnectorEnabled()) {
+        await emitInviteAccepted(ctx, meeting, invite, actorFromIdentity(identity));
+      }
     }
 
     await insertAuditLog(ctx, {
