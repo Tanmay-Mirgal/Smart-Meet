@@ -77,7 +77,25 @@ export function ConsentScreen({ params }: { params: AuthorizeParams }) {
   }
 
   if (!isAuthenticated) {
-    return <Notice title="Sign in required" message="Please sign in to Meetup to continue." />;
+    const returnUrl = typeof window !== "undefined" ? window.location.href : "/connect/authorize";
+    return (
+      <Frame>
+        <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <h1 className="text-lg font-semibold text-foreground">Sign in required</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Please sign in to your Meetup account to authorize this connection.
+          </p>
+          <div className="mt-4">
+            <Button onClick={() => window.location.assign(`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`)}>
+              Sign in to Meetup
+            </Button>
+          </div>
+        </div>
+      </Frame>
+    );
   }
 
   if (!prepared || prepared.status === "disabled") {
