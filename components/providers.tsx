@@ -7,9 +7,15 @@ import { useAuth } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { SyncUserWithConvex } from "@/components/sync-user-with-convex";
 
+// Ensure we connect to the active production deployment (gregarious-seal-751)
+// even if Vercel still has the obsolete glorious-gopher deployment in its env.
 const convexUrl =
-  process.env.NEXT_PUBLIC_CONVEX_URL ||
-  "https://gregarious-seal-751.convex.cloud";
+  process.env.NEXT_PUBLIC_CONVEX_URL &&
+  !process.env.NEXT_PUBLIC_CONVEX_URL.includes("glorious-gopher") &&
+  !process.env.NEXT_PUBLIC_CONVEX_URL.includes("tame-walrus")
+    ? process.env.NEXT_PUBLIC_CONVEX_URL
+    : "https://gregarious-seal-751.convex.cloud";
+
 const convex = new ConvexReactClient(convexUrl);
 
 /**
