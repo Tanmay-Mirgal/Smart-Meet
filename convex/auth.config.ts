@@ -3,8 +3,13 @@ import { AuthConfig } from "convex/server";
 export default {
     providers: [
         {
-            domain: process.env.CLERK_JWT_ISSUER_DOMAIN || "https://alive-liger-48.clerk.accounts.dev",
+            domain: "https://clerk.tanmaymirgal.dev",
+            applicationID: "convex",
+        },
+        {
+            domain: "https://alive-liger-48.clerk.accounts.dev",
             applicationID: "convex",
         },
     ],
 } satisfies AuthConfig;
+
