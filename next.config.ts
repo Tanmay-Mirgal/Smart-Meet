@@ -15,14 +15,7 @@ const securityHeaders = [
 // /api/connect/* and the well-known document are ordinary 404s and the app
 // behaves exactly as before.
 const connectorEnabled = process.env.CONNECTOR_ENABLED !== "false";
-const rawConvexSiteUrl =
-  process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim() ||
-  process.env.NEXT_PUBLIC_CONVEX_URL?.trim() ||
-  "https://gregarious-seal-751.convex.site";
-
-const convexSiteUrl = rawConvexSiteUrl
-  .replace(/\/+$/, "")
-  .replace(/\.convex\.cloud$/, ".convex.site");
+const convexSiteUrl = "https://gregarious-seal-751.convex.site";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

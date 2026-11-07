@@ -2,14 +2,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const rawConvexSiteUrl =
-  process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim() ||
-  process.env.NEXT_PUBLIC_CONVEX_URL?.trim() ||
-  "https://gregarious-seal-751.convex.site";
-
-const CONVEX_SITE_URL = rawConvexSiteUrl
-  .replace(/\/+$/, "")
-  .replace(/\.convex\.cloud$/, ".convex.site");
+const CONVEX_SITE_URL = "https://gregarious-seal-751.convex.site";
 
 export async function GET() {
   const targetUrl = `${CONVEX_SITE_URL}/connect/v1/manifest`;
@@ -46,4 +39,3 @@ export async function GET() {
     );
   }
 }
-
