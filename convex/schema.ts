@@ -209,6 +209,7 @@ export default defineSchema({
     text: v.string(),
     timestamp: v.number(),
     createdAt: v.number(),
+    clientId: v.optional(v.string()),
   }).index("by_meetingId_and_timestamp", ["meetingId", "timestamp"]),
 
   meeting_assets: defineTable({
