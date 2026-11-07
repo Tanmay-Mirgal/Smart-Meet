@@ -39,7 +39,11 @@ const prepareResult = v.union(
     user: v.object({ name: v.string(), email: v.union(v.string(), v.null()) }),
     scopes: v.array(v.object({ name: v.string(), description: v.string() })),
     organizations: v.array(
-      v.object({ id: v.string(), name: v.string(), imageUrl: v.optional(v.string()) }),
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        imageUrl: v.optional(v.union(v.string(), v.null())),
+      }),
     ),
     cancelUrl: v.string(),
   }),
@@ -80,7 +84,14 @@ export const prepare = query({
       };
     }
 
-    const identity = await requireIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return {
+        status: "fatal" as const,
+        reason: "unauthenticated",
+        message: "Please sign in to Meetup to continue.",
+      };
+    }
 
     // Eligible tenants: the organizations this user belongs to. (Meetup stores
     // membership, not Clerk roles, so every membership can satisfy every scope;
@@ -103,9 +114,18 @@ export const prepare = query({
       organizations.push({
         id: orgId,
         name: organization?.name ?? "Workspace",
-        imageUrl: organization?.imageUrl,
+        imageUrl: organization?.imageUrl ?? undefined,
       });
     }
+
+    if (organizations.length === 0) {
+      const userName = getIdentityName(identity);
+      organizations.push({
+        id: identity.subject,
+        name: `${userName}'s Workspace`,
+      });
+    }
+
     organizations.sort((a, b) => a.name.localeCompare(b.name));
 
     return {
@@ -146,7 +166,8 @@ export const approve = mutation({
 
     const identity = await requireIdentity(ctx);
     // A grant is pinned to exactly one tenant, and only one the user belongs to.
-    if (!(await hasOrgAccess(ctx, identity.tokenIdentifier, orgId))) {
+    const isPersonal = orgId === identity.subject || orgId === identity.tokenIdentifier;
+    if (!isPersonal && !(await hasOrgAccess(ctx, identity.tokenIdentifier, orgId))) {
       throw new Error("Forbidden");
     }
 

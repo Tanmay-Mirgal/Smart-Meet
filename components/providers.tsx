@@ -7,7 +7,10 @@ import { useAuth } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { SyncUserWithConvex } from "@/components/sync-user-with-convex";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convexUrl =
+  process.env.NEXT_PUBLIC_CONVEX_URL ||
+  "https://gregarious-seal-751.convex.cloud";
+const convex = new ConvexReactClient(convexUrl);
 
 /**
  * Realtime data layer (Convex + toasts + user sync).
