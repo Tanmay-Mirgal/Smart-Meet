@@ -88,9 +88,12 @@ export function ConsentScreen({ params }: { params: AuthorizeParams }) {
           <p className="text-sm leading-relaxed text-muted-foreground">
             Please sign in to your Meetup account to authorize this connection.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex items-center justify-center gap-3">
             <Button onClick={() => window.location.assign(`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`)}>
               Sign in to Meetup
+            </Button>
+            <Button variant="outline" onClick={() => window.location.assign(`/sign-up?redirect_url=${encodeURIComponent(returnUrl)}`)}>
+              Create Account
             </Button>
           </div>
         </div>
