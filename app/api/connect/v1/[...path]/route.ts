@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const CONVEX_SITE_URL = (
+const rawConvexSiteUrl =
   process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim() ||
-  "https://gregarious-seal-751.convex.site"
-).replace(/\/+$/, "");
+  process.env.NEXT_PUBLIC_CONVEX_URL?.trim() ||
+  "https://gregarious-seal-751.convex.site";
+
+const CONVEX_SITE_URL = rawConvexSiteUrl
+  .replace(/\/+$/, "")
+  .replace(/\.convex\.cloud$/, ".convex.site");
 
 async function proxy(
   req: NextRequest,
@@ -60,3 +64,4 @@ export const PATCH = proxy;
 export const DELETE = proxy;
 export const HEAD = proxy;
 export const OPTIONS = proxy;
+
