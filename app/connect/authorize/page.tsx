@@ -26,7 +26,7 @@ function first(value: string | string[] | undefined) {
  */
 export default async function AuthorizePage({ searchParams }: { searchParams: SearchParams }) {
   // Connector disabled ⇒ the route does not exist (CP1 §6).
-  if (process.env.CONNECTOR_ENABLED !== "true") {
+  if (process.env.CONNECTOR_ENABLED === "false") {
     notFound();
   }
 

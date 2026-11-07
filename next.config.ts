@@ -14,14 +14,11 @@ const securityHeaders = [
 // Ecosystem Connector (CP1). When the flag is off no rewrite exists at all, so
 // /api/connect/* and the well-known document are ordinary 404s and the app
 // behaves exactly as before.
-const connectorEnabled = process.env.CONNECTOR_ENABLED === "true";
-const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim().replace(/\/+$/, "");
-
-if (connectorEnabled && !convexSiteUrl) {
-  throw new Error(
-    "CONNECTOR_ENABLED=true requires NEXT_PUBLIC_CONVEX_SITE_URL (the https://<deployment>.convex.site origin).",
-  );
-}
+const connectorEnabled = process.env.CONNECTOR_ENABLED !== "false";
+const convexSiteUrl = (
+  process.env.NEXT_PUBLIC_CONVEX_SITE_URL?.trim() ||
+  "https://gregarious-seal-751.convex.site"
+).replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
